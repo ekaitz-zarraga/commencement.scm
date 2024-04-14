@@ -46,6 +46,7 @@
   #:use-module (gnu packages guile)
   #:use-module (gnu packages gettext)
   #:use-module (gnu packages multiprecision)
+  #:use-module (gnu packages musl)
   #:use-module (gnu packages compression)
   #:use-module (gnu packages mes)
   #:use-module (gnu packages perl)
@@ -1010,6 +1011,55 @@ MesCC-Tools), and finally M2-Planet.")
     ("patch" ,patch-mesboot)
     ("tcc" ,tcc-boot)
     ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
+
+
+(define musl-boot0
+  (package
+    (inherit musl)
+    (name "musl-boot0")
+    (version "1.1.24")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append "https://www.musl-libc.org/releases/"
+                                  "musl-" version ".tar.gz"))
+              (sha256
+               (base32
+                "18r2a00k82hz0mqdvgm7crzc7305l36109c0j9yjmkxj2alcjw0k"))))
+    (native-inputs (%boot-tcc-inputs))
+    (arguments
+     (list
+       #:tests? #f                      ; musl has no tests
+       #:guile %bootstrap-guile
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:make-flags
+       #~(list
+           (string-append "SHELL=" #$(this-package-native-input "bash")
+                          "/bin/bash")
+           "AR=tcc -ar"
+           "RANLIB=true"
+           "CFLAGS=-DSYSCALL_NO_TLS -D__riscv_float_abi_soft -U__riscv_flen")
+       #:configure-flags
+       #~(let ((bash #$(this-package-native-input "bash")))
+           (list "CC=tcc -static"
+                 (string-append "CONFIG_SHELL=" bash "/bin/sh")
+                 "--disable-shared"
+                 "--disable-gcc-wrapper"))
+       #:phases #~(modify-phases %standard-phases
+         (add-before 'build 'patch-shebang-in-makefile
+           (lambda _
+             (let ((bash #$(this-package-native-input "bash")))
+               (substitute* "Makefile"
+                 (("#!/bin/sh") (string-append "#!" bash "/bin/bash"))))))
+         (add-after 'configure 'remove-complex
+           (lambda _
+             (delete-file-recursively "src/complex")))
+         (add-after 'configure 'remove-atomic-instructions
+           (lambda _
+             (substitute* "arch/riscv64/atomic_arch.h"
+               (("__asm__.*;") "")
+               (("\t\".*\"") "\"\"")))))))))
+
 
 (define binutils-mesboot0
   ;; The initial Binutils
