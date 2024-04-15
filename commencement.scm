@@ -863,14 +863,10 @@ MesCC-Tools), and finally M2-Planet.")
        (modify-phases %standard-phases
          (replace 'configure
            (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref %outputs "out"))
-                    (tcc (assoc-ref %build-inputs "tcc"))
-                    (libc (assoc-ref %build-inputs "libc"))
-                    (interpreter "/mes/loader"))
-               (call-with-output-file
+             (call-with-output-file
                  "config.h"
                  (lambda (port)
-                   (display "#define TCC_VERSION \"0.9.28rc\" " port))))))
+                   (display "#define TCC_VERSION \"0.9.28rc\" " port)))))
 
          (replace 'build
            (lambda* (#:key outputs #:allow-other-keys)
@@ -901,12 +897,28 @@ MesCC-Tools), and finally M2-Planet.")
                 "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\"")
                 "-o" "tcc"
                 "tcc.c"))))
-         (replace 'check
-           (lambda _
-             ;; FIXME: add sensible check target (without depending on make)
-             ;; ./check.sh ?
-             (= 1 (status:exit-val (system* "./tcc" "--help")))))
-         (replace 'install
+
+         (add-after 'build 'build-libtcc1.a
+           (lambda* (#:key outputs #:allow-other-keys)
+             (let ((mes (assoc-ref %build-inputs "mes")))
+               (and
+                 (invoke "./tcc"
+                         "-g" "-vvv"
+                         "-I" (string-append "include")
+                         "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
+                         "-c" "-o" "libtcc1.o" (string-append mes "/lib/gcc/libtcc1.c"))
+                 (cond
+                   (,(or (target-aarch64?) (target-riscv64?))
+                     (invoke "./tcc"
+                             "-g" "-vvv"
+                             "-I" (string-append "include")
+                             "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
+                             "-c" "-o" "lib-arm64.o" "lib/lib-arm64.c")
+                     (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o" "lib-arm64.o"))
+                   (else
+                     (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o")))))))
+
+        (add-after 'build-libtcc1.a 'rebuild-libc.a
            (lambda* (#:key outputs #:allow-other-keys)
              (let* ((out (assoc-ref %outputs "out"))
                     (mes (assoc-ref %build-inputs "mes"))
@@ -933,41 +945,45 @@ MesCC-Tools), and finally M2-Planet.")
                       "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\"")
                       "-D" (string-append "TCC_LIBTCC1_MES=\"libtcc1-mes.a\""))))
                (and
+                (apply invoke "./tcc"
+                       "-v"
+                       "-c" "-o" "libc.o"
+                       "-I" (string-append tcc "/include")
+                       "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                       "-I" "include"
+                       (string-append mes "/lib/gcc/libc+gnu.c")
+                       cppflags)
+                (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o")))))
+
+        (replace 'check
+           (lambda _
+             ;; FIXME: add sensible check target (without depending on make)
+             ;; ./check.sh ?
+             (= 1 (status:exit-val (system* "./tcc" "--help")))))
+
+         (replace 'install
+           (lambda* (#:key outputs #:allow-other-keys)
+             (let* ((out (assoc-ref %outputs "out"))
+                    (tcc (assoc-ref %build-inputs "tcc")))
+               (and
+                ;; Install the tcc binary
                 (mkdir-p (string-append out "/bin"))
                 (copy-file "tcc" (string-append out "/bin/tcc"))
+                ;; Install tcc headers
                 (copy-recursively (string-append "include")
                                   (string-append out "/include"))
                 (copy-recursively (string-append tcc "/include")
                                   (string-append out "/include"))
+                ;; Install tcc libraries
                 (copy-recursively (string-append tcc "/lib")
                                   (string-append out "/lib"))
-                (invoke "./tcc"
-                        "-g" "-vvv"
-                        "-I" (string-append "include")
-                        "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                        "-c" "-o" "libtcc1.o" (string-append mes "/lib/gcc/libtcc1.c"))
-                (cond
-                  (,(or (target-aarch64?) (target-riscv64?))
-                   (invoke "./tcc"
-                           "-g" "-vvv"
-                           "-I" (string-append "include")
-                           "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                           "-c" "-o" "lib-arm64.o" "lib/lib-arm64.c")
-                   (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o" "lib-arm64.o"))
-                  (else
-                   (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o")))
+                ;; Install libtcc1.a
                 (copy-file "libtcc1.a" (string-append out "/lib/libtcc1.a"))
                 (delete-file (string-append out "/lib/tcc/libtcc1.a"))
                 (copy-file "libtcc1.a"
                            (string-append out "/lib/tcc/libtcc1.a"))
-
+                ;; Install libc.a
                 (delete-file (string-append out "/lib/libc.a"))
-                (apply invoke "./tcc" "-c" "-o" "libc.o"
-                       "-I" (string-append tcc "/include")
-                       "-I" (string-append tcc "/include/linux/" ,(mes-system))
-                       (string-append mes "/lib/gcc/libc+gnu.c")
-                       cppflags)
-                (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o")
                 (copy-file "libc.a" (string-append out "/lib/libc.a")))))))))))
 
 
