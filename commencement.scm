@@ -381,7 +381,7 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit mes)
     (name "mes-boot")
-    (version "wip-tcc-and-gcc")
+    (version "riscv-good-asm")
     (source
       (origin
                 (method git-fetch)
@@ -391,7 +391,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "066zid3nf45n03zkc0s0g4whzrciahl1dca7527np0xksy6g7cy3")))
+                    "1cxmyn2xvibmbx76izcv36vbqza2qj0vx4q3pxcrg7s1wqs9l5b0")))
       #;(origin
               (method url-fetch)
               (uri (list (string-append "mirror://gnu/mes/"
@@ -489,7 +489,7 @@ MesCC-Tools), and finally M2-Planet.")
     (inherit tcc)
     (name "tcc-boot0")
     ;(version "0.9.26-1150-ga0de0ae4")
-    (version "riscv-mes")
+    (version "riscv-good-asm")
     (source  (origin
                 (method git-fetch)
                 (uri (git-reference
@@ -498,7 +498,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "10h6p9yadihqzlx2fczzr8sw1qgajl8mmzjrhhzzzrpwq69ny712")))
+                    "1pcch33cqbzd5ryg584nr5z1gk4d4sa896kv1jf36jrkbz1y6bqv")))
             #;(origin
               (method url-fetch)
               (uri (list
@@ -906,7 +906,7 @@ MesCC-Tools), and finally M2-Planet.")
                          "-g" "-vvv"
                          "-I" (string-append "include")
                          "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                         "-c" "-o" "libtcc1.o" (string-append mes "/lib/gcc/libtcc1.c"))
+                         "-c" "-o" "libtcc1.o" (string-append mes "/lib/libtcc1.c"))
                  (cond
                    (,(or (target-aarch64?) (target-riscv64?))
                      (invoke "./tcc"
@@ -951,7 +951,7 @@ MesCC-Tools), and finally M2-Planet.")
                        "-I" (string-append tcc "/include")
                        "-I" (string-append tcc "/include/linux/" ,(mes-system))
                        "-I" "include"
-                       (string-append mes "/lib/gcc/libc+gnu.c")
+                       (string-append mes "/lib/libc+gnu.c")
                        cppflags)
                 (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o")))))
 
