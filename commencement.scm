@@ -1082,17 +1082,15 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit binutils)
     (name "binutils-mesboot0")
-    (version "2.28.1")
+    (version "2.30")
     (source (bootstrap-origin
              (origin
                (method url-fetch)
                (uri (string-append "mirror://gnu/binutils/binutils-"
                                    version ".tar.gz"))
-               #;(patches (search-patches "binutils-boot-2.20.1a.patch"))
-               #;(patch-guile %bootstrap-guile)
                (sha256
                 (base32
-                 "1h0289rkm4y61ww3nxxpc8d9h38dlvq3v6nhrsxn30zp5d9skm3n")))))
+                 "1sp9g7zrrcsl25hxiqzmmcrdlbm7rbmj0vki18lks28wblcm0f4c")))))
     (inputs '())
     (propagated-inputs '())
     (native-inputs (%boot-tcc-inputs))
@@ -1103,32 +1101,32 @@ MesCC-Tools), and finally M2-Planet.")
            #:tests? #f ; runtest: command not found
            #:parallel-build? #f
            #:strip-binaries? #f ; no strip yet
-           #:phases `(modify-phases %standard-phases
-           (add-after 'configure 'fix-build
-                      (lambda _
-                        (substitute* "gas/read.c"
-                          (("#include \"wchar.h\"") ""))
-                        (call-with-output-file "bfd/po/all" (lambda (p) (display "" p)))
-                        (call-with-output-file "bfd/po/info" (lambda (p) (display "" p))) ))
-           #;(add-after 'build 'libtool
-                      (lambda _
-                        (substitute* "ld/libtool"
-                          (("finish_cmds=.*") "finish_cmds='true'"))
-                        (substitute* "bfd/libtool"
-                          (("finish_cmds=.*") "finish_cmds='true'"))))
-           )
+           #:phases
+           #~(modify-phases %standard-phases
+             (add-after 'configure 'fix-build
+               (lambda _
+                 ;; Meslibc doesn't have wchar.h
+                 (substitute* "gas/read.c"
+                   (("#include \"wchar.h\"") ""))
+                 ;; bfd/po doesn't have a Makefile, so the recursive calls just
+                 ;; fail. We add files with the same name Make targets have, to
+                 ;; trick Make into thinking there's nothing to do.
+                 (call-with-output-file "bfd/po/install"
+                   (lambda (p) (display "" p)))
+                 (call-with-output-file "bfd/po/all"
+                   (lambda (p) (display "" p)))
+                 (call-with-output-file "bfd/po/info"
+                   (lambda (p) (display "" p))))))
            #:configure-flags
-           #~(let ((cppflags (string-join '("-static"
-                                            "-D__GLIBC_MINOR__=6"
-                                            "-DMES_BOOTSTRAP=1")))
+           #~(let ((cppflags "-D__GLIBC_MINOR__=6")
                    (bash (assoc-ref %build-inputs "bash")))
                `(,(string-append "CONFIG_SHELL=" bash "/bin/sh")
                  ,(string-append "CPPFLAGS=" cppflags)
                  "AR=tcc -ar"
-                 ;"LD=tcc -static"
+                 "MAKEINFO=true"
                  "RANLIB=true"
-                 ,(string-append "CC=tcc" " " cppflags)
-                 "--enable-shared=no"
+                 "CC=tcc -static"
+                 "--enable-64-bit-bfd"
                  "--disable-nls"
                  "--disable-shared"
                  "--disable-werror"
