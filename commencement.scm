@@ -869,10 +869,10 @@ MesCC-Tools), and finally M2-Planet.")
                    (display "#define TCC_VERSION \"0.9.28rc\" " port)))))
 
          (replace 'build
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref %outputs "out"))
-                    (tcc (assoc-ref %build-inputs "tcc"))
-                    (libc (assoc-ref %build-inputs "libc"))
+           (lambda* (#:key outputs inputs #:allow-other-keys)
+             (let* ((out (assoc-ref outputs "out"))
+                    (tcc (assoc-ref inputs "tcc"))
+                    (libc (assoc-ref inputs "libc"))
                     (interpreter "/mes/loader"))
                (invoke
                 "tcc"
@@ -898,8 +898,8 @@ MesCC-Tools), and finally M2-Planet.")
                 "tcc.c"))))
 
          (add-after 'build 'build-libtcc1.a
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let ((mes (assoc-ref %build-inputs "mes")))
+           (lambda* (#:key outputs inputs #:allow-other-keys)
+             (let ((mes (assoc-ref inputs "mes")))
                (and
                  (invoke "./tcc"
                          "-g" "-v"
@@ -918,10 +918,10 @@ MesCC-Tools), and finally M2-Planet.")
                      (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o")))))))
 
         (add-after 'build-libtcc1.a 'rebuild-libc.a
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref %outputs "out"))
-                    (mes (assoc-ref %build-inputs "mes"))
-                    (tcc (assoc-ref %build-inputs "tcc"))
+           (lambda* (#:key outputs inputs #:allow-other-keys)
+             (let* ((out (assoc-ref outputs "out"))
+                    (mes (assoc-ref inputs "mes"))
+                    (tcc (assoc-ref inputs "tcc"))
                     (interpreter "/mes/loader")
                     (cppflags
                      (list
@@ -958,9 +958,9 @@ MesCC-Tools), and finally M2-Planet.")
              (= 1 (status:exit-val (system* "./tcc" "--help")))))
 
          (replace 'install
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref %outputs "out"))
-                    (tcc (assoc-ref %build-inputs "tcc")))
+           (lambda* (#:key outputs inputs #:allow-other-keys)
+             (let* ((out (assoc-ref outputs "out"))
+                    (tcc (assoc-ref inputs "tcc")))
                (and
                 ;; Install the tcc binary
                 (mkdir-p (string-append out "/bin"))
