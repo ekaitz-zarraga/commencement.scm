@@ -921,34 +921,14 @@ MesCC-Tools), and finally M2-Planet.")
            (lambda* (#:key outputs inputs #:allow-other-keys)
              (let* ((out (assoc-ref outputs "out"))
                     (mes (assoc-ref inputs "mes"))
-                    (tcc (assoc-ref inputs "tcc"))
-                    (interpreter "/mes/loader")
-                    (cppflags
-                     (list
-                      "-D" "ONE_SOURCE=1"
-                      "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                      "-D" "CONFIG_TCCBOOT=1"
-                      "-D" "CONFIG_TCC_STATIC=1"
-                      "-D" "CONFIG_USE_LIBGCC=1"
-                      "-D" "CONFIG_TCC_SEMLOCK=0"
-                      "-D" (string-append "CONFIG_TCCDIR=\"" out "/lib/tcc\"")
-                      "-D" (string-append "CONFIG_TCC_CRTPREFIX=\"" out "/lib:{B}/lib:.\"")
-                      "-D" (string-append "CONFIG_TCC_ELFINTERP=\"" interpreter "\"")
-                      "-D" (string-append "CONFIG_TCC_LIBPATHS=\"" tcc "/lib" ":"
-                                                                   out "/lib" ":"
-                                                                   "{B}/lib:.\"")
-                      "-D" (string-append "CONFIG_TCC_SYSINCLUDEPATHS=\"" tcc "/include" ":"
-                                                                          out "/include" ":"
-                                                                          "{B}/include\"")
-                      "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\""))))
+                    (tcc (assoc-ref inputs "tcc")))
                (and
-                (apply invoke "./tcc" "-g" "-v"
+                (invoke "./tcc" "-g" "-v"
                        "-c" "-o" "libc.o"
                        "-I" (string-append tcc "/include")
                        "-I" (string-append tcc "/include/linux/" ,(mes-system))
                        "-I" "include"
-                       (string-append mes "/lib/libc+gnu.c")
-                       cppflags)
+                       (string-append mes "/lib/libc+gnu.c"))
                 (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o")))))
 
         (replace 'check
