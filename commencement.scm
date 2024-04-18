@@ -905,7 +905,7 @@ MesCC-Tools), and finally M2-Planet.")
                          "-g" "-v"
                          "-I" (string-append "include")
                          "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                         "-c" "-o" "libtcc1.o" (string-append mes "/lib/libtcc1.c"))
+                         "-c" "-o" "libtcc1.o" "lib/libtcc1.c")
                  (cond
                    (,(or (target-aarch64?) (target-riscv64?))
                      (invoke "./tcc"
@@ -940,8 +940,7 @@ MesCC-Tools), and finally M2-Planet.")
                       "-D" (string-append "CONFIG_TCC_SYSINCLUDEPATHS=\"" tcc "/include" ":"
                                                                           out "/include" ":"
                                                                           "{B}/include\"")
-                      "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\"")
-                      "-D" (string-append "TCC_LIBTCC1_MES=\"libtcc1-mes.a\""))))
+                      "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\""))))
                (and
                 (apply invoke "./tcc" "-g" "-v"
                        "-c" "-o" "libc.o"
