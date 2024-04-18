@@ -877,8 +877,7 @@ MesCC-Tools), and finally M2-Planet.")
                (invoke
                 "tcc"
                 "-g"
-                "-vvv"
-                "-D" "BOOTSTRAP=1"
+                "-v"
                 "-D" "ONE_SOURCE=1"
                 "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
                 "-D" "TCC_VERSION=\"0.9.28rc\""
@@ -903,14 +902,14 @@ MesCC-Tools), and finally M2-Planet.")
              (let ((mes (assoc-ref %build-inputs "mes")))
                (and
                  (invoke "./tcc"
-                         "-g" "-vvv"
+                         "-g" "-v"
                          "-I" (string-append "include")
                          "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
                          "-c" "-o" "libtcc1.o" (string-append mes "/lib/libtcc1.c"))
                  (cond
                    (,(or (target-aarch64?) (target-riscv64?))
                      (invoke "./tcc"
-                             "-g" "-vvv"
+                             "-g" "-v"
                              "-I" (string-append "include")
                              "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
                              "-c" "-o" "lib-arm64.o" "lib/lib-arm64.c")
@@ -926,7 +925,6 @@ MesCC-Tools), and finally M2-Planet.")
                     (interpreter "/mes/loader")
                     (cppflags
                      (list
-                      "-D" "BOOTSTRAP=1"
                       "-D" "ONE_SOURCE=1"
                       "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
                       "-D" "CONFIG_TCCBOOT=1"
@@ -945,8 +943,7 @@ MesCC-Tools), and finally M2-Planet.")
                       "-D" (string-append "TCC_LIBGCC=\"" tcc "/lib/libc.a\"")
                       "-D" (string-append "TCC_LIBTCC1_MES=\"libtcc1-mes.a\""))))
                (and
-                (apply invoke "./tcc"
-                       "-v"
+                (apply invoke "./tcc" "-g" "-v"
                        "-c" "-o" "libc.o"
                        "-I" (string-append tcc "/include")
                        "-I" (string-append tcc "/include/linux/" ,(mes-system))
@@ -1118,14 +1115,14 @@ MesCC-Tools), and finally M2-Planet.")
                  (call-with-output-file "bfd/po/info"
                    (lambda (p) (display "" p))))))
            #:configure-flags
-           #~(let ((cppflags "-D__GLIBC_MINOR__=6")
-                   (bash (assoc-ref %build-inputs "bash")))
+           #~(let ((bash (assoc-ref %build-inputs "bash")))
                `(,(string-append "CONFIG_SHELL=" bash "/bin/sh")
-                 ,(string-append "CPPFLAGS=" cppflags)
+                 "CFLAGS=-g"
                  "AR=tcc -ar"
                  "MAKEINFO=true"
                  "RANLIB=true"
-                 "CC=tcc -static"
+                 "CC=tcc -static -g"
+                 "LD=tcc -g"
                  "--enable-64-bit-bfd"
                  "--disable-nls"
                  "--disable-shared"
