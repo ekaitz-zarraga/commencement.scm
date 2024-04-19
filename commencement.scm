@@ -954,6 +954,9 @@ MesCC-Tools), and finally M2-Planet.")
                 (copy-recursively (string-append tcc "/lib")
                                   (string-append out "/lib"))
                 ;; Install libtcc1.a
+                (let ((path (string-append out "/lib/libtcc1.a")))
+                  ;; Makes inheriting a next tcc-mob easier
+                  (if (file-exists? path) (delete-file path)))
                 (copy-file "libtcc1.a" (string-append out "/lib/libtcc1.a"))
                 (delete-file (string-append out "/lib/tcc/libtcc1.a"))
                 (copy-file "libtcc1.a"
