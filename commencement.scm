@@ -851,8 +851,7 @@ MesCC-Tools), and finally M2-Planet.")
     (build-system gnu-build-system)
     (inputs '())
     (propagated-inputs '())
-    (native-inputs `(("mes" ,mes-boot)
-                     ;; We don't need "make" for this anymore
+    (native-inputs `(;; We don't need "make" for this anymore
                      ,@(alist-delete "make" (%boot-tcc0-inputs))))
     (arguments
      `(#:implicit-inputs? #f
@@ -877,7 +876,7 @@ MesCC-Tools), and finally M2-Planet.")
                (invoke
                 "tcc"
                 "-g"
-                "-v"
+                "-vvv"
                 "-D" "ONE_SOURCE=1"
                 "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
                 "-D" "TCC_VERSION=\"0.9.28rc\""
@@ -899,37 +898,60 @@ MesCC-Tools), and finally M2-Planet.")
 
          (add-after 'build 'build-libtcc1.a
            (lambda* (#:key outputs inputs #:allow-other-keys)
-             (let ((mes (assoc-ref inputs "mes")))
-               (and
-                 (invoke "./tcc"
-                         "-g" "-v"
-                         "-I" (string-append "include")
-                         "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                         "-c" "-o" "libtcc1.o" "lib/libtcc1.c")
-                 (cond
-                   (,(or (target-aarch64?) (target-riscv64?))
-                     (invoke "./tcc"
-                             "-g" "-v"
-                             "-I" (string-append "include")
-                             "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
-                             "-c" "-o" "lib-arm64.o" "lib/lib-arm64.c")
-                     (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o" "lib-arm64.o"))
-                   (else
-                     (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o")))))))
+             (and
+               (invoke "./tcc"
+                       "-g" "-vvv"
+                       "-I" (string-append "include")
+                       "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
+                       "-c" "-o" "libtcc1.o" "lib/libtcc1.c")
+               (cond
+                 (,(or (target-aarch64?) (target-riscv64?))
+                   (invoke "./tcc"
+                           "-g" "-vvv"
+                           "-I" (string-append "include")
+                           "-D" (string-append "TCC_TARGET_" (string-upcase ,(tcc-system)) "=1")
+                           "-c" "-o" "lib-arm64.o" "lib/lib-arm64.c")
+                   (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o" "lib-arm64.o"))
+                 (else
+                   (invoke "./tcc" "-ar" "rc" "libtcc1.a" "libtcc1.o"))))))
 
         (add-after 'build-libtcc1.a 'rebuild-libc.a
            (lambda* (#:key outputs inputs #:allow-other-keys)
              (let* ((out (assoc-ref outputs "out"))
-                    (mes (assoc-ref inputs "mes"))
                     (tcc (assoc-ref inputs "tcc")))
                (and
-                (invoke "./tcc" "-g" "-v"
+                (invoke "./tcc" "-g" "-vvv"
                        "-c" "-o" "libc.o"
                        "-I" (string-append tcc "/include")
                        "-I" (string-append tcc "/include/linux/" ,(mes-system))
                        "-I" "include"
-                       (string-append mes "/lib/libc+gnu.c"))
+                       (string-append tcc "/share/libc.c"))
                 (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o")))))
+
+        (add-after 'rebuild-libc.a 'rebuild-libgetopt.a
+          (lambda* (#:key outputs inputs #:allow-other-keys)
+            (let* ((out (assoc-ref outputs "out"))
+                   (tcc (assoc-ref inputs "tcc")))
+              (and
+               (invoke "./tcc" "-g" "-vvv"
+                      "-c" "-o" "libgetopt.o"
+                      "-I" (string-append tcc "/include")
+                      "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                      "-I" "include"
+                      (string-append tcc "/share/libgetopt.c"))
+               (invoke "./tcc" "-ar" "rc" "libgetopt.a" "libgetopt.o")))))
+
+        (add-after 'rebuild-libgetopt.a 'rebuild-crt1
+          (lambda* (#:key outputs inputs #:allow-other-keys)
+            (let* ((out (assoc-ref outputs "out"))
+                   (tcc (assoc-ref inputs "tcc")))
+              (and
+               (invoke "./tcc" "-g" "-vvv"
+                      "-c" "-o" "crt1.o"
+                      "-I" (string-append tcc "/include")
+                      "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                      "-I" "include"
+                      (string-append tcc "/share/crt1.c"))))))
 
         (replace 'check
            (lambda _
@@ -950,19 +972,25 @@ MesCC-Tools), and finally M2-Planet.")
                                   (string-append out "/include"))
                 (copy-recursively (string-append tcc "/include")
                                   (string-append out "/include"))
-                ;; Install tcc libraries
-                (copy-recursively (string-append tcc "/lib")
-                                  (string-append out "/lib"))
-                ;; Install libtcc1.a
-                (let ((path (string-append out "/lib/libtcc1.a")))
-                  ;; Makes inheriting a next tcc-mob easier
-                  (if (file-exists? path) (delete-file path)))
+                ;; Install stdlib sources from previous tcc
+                (copy-recursively (string-append tcc "/share")
+                                  (string-append out "/share"))
+                (delete-file-recursively (string-append out "/share/doc"))
+                ;; Install libraries
+                (mkdir-p (string-append out "/lib/tcc/"))
+                ;; - Pass empty crts
+                (copy-file (string-append tcc "/lib/crti.o")
+                           (string-append out "/lib/crti.o"))
+                (copy-file (string-append tcc "/lib/crtn.o")
+                           (string-append out "/lib/crtn.o"))
+                ;; - Install libtcc1.a
                 (copy-file "libtcc1.a" (string-append out "/lib/libtcc1.a"))
-                (delete-file (string-append out "/lib/tcc/libtcc1.a"))
-                (copy-file "libtcc1.a"
-                           (string-append out "/lib/tcc/libtcc1.a"))
-                ;; Install libc.a
-                (delete-file (string-append out "/lib/libc.a"))
+                (copy-file "libtcc1.a" (string-append out "/lib/tcc/libtcc1.a"))
+                ;; - Install libgetopt
+                (copy-file "libgetopt.a" (string-append out "/lib/libgetopt.a"))
+                ;; - Install crt1.o
+                (copy-file "crt1.o" (string-append out "/lib/crt1.o"))
+                ;; - Install libc.a
                 (copy-file "libc.a" (string-append out "/lib/libc.a")))))))))))
 
 
