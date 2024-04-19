@@ -966,6 +966,14 @@ MesCC-Tools), and finally M2-Planet.")
                 (copy-file "libc.a" (string-append out "/lib/libc.a")))))))))))
 
 
+(define tcc-boot1
+  (package
+    (inherit tcc-boot)
+    (name "tcc-boot1")
+    (native-inputs
+      `(("tcc" ,tcc-boot)
+        ,@(alist-delete "tcc" (package-native-inputs tcc-boot))))))
+
 (define patch-mesboot
   ;; The initial patch.
   (package
