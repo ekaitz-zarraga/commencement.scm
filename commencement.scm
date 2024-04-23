@@ -489,7 +489,7 @@ MesCC-Tools), and finally M2-Planet.")
     (inherit tcc)
     (name "tcc-boot0")
     ;(version "0.9.26-1150-ga0de0ae4")
-    (version "mes-0.25")
+    (version "riscv-mes")
     (source  (origin
                 (method git-fetch)
                 (uri (git-reference
@@ -498,7 +498,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "1wf0qsm8vn93fc8p9nl4zqr8jv5fzlmlmksrh146ps4abbw426ml")))
+                    "10dpgvvrj0p3c0fl2mm9r0d4diz0dx9i6gbv098502sjmqgf35ra")))
             #;(origin
               (method url-fetch)
               (uri (list
@@ -840,7 +840,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "0gba9g10x278dga2vvj1f003y177f2xqwx7zkzzag5njp06hlhyy")))
+                    "0wki5qk962pwvcfgnn1fjlmh34clq4ld0707avc304acl6s81l44")))
       #;(origin
               (method url-fetch)
               (uri (string-append "mirror://savannah/tinycc/tcc-"
