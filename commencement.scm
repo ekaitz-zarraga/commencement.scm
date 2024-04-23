@@ -1093,12 +1093,8 @@ MesCC-Tools), and finally M2-Planet.")
                  (("#!/bin/sh") (string-append "#!" bash "/bin/bash"))))))
          (add-after 'configure 'remove-complex
            (lambda _
-             (delete-file-recursively "src/complex")))
-         (add-after 'configure 'remove-atomic-instructions
-           (lambda _
-             (substitute* "arch/riscv64/atomic_arch.h"
-               (("__asm__.*;") "")
-               (("\t\".*\"") "\"\"")))))))))
+             (delete-file-recursively "src/complex"))))))))
+
 
 
 (define binutils-mesboot0
