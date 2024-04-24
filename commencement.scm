@@ -1085,16 +1085,114 @@ MesCC-Tools), and finally M2-Planet.")
                  (string-append "CONFIG_SHELL=" bash "/bin/sh")
                  "--disable-shared"
                  "--disable-gcc-wrapper"))
-       #:phases #~(modify-phases %standard-phases
-         (add-before 'build 'patch-shebang-in-makefile
-           (lambda _
-             (let ((bash #$(this-package-native-input "bash")))
-               (substitute* "Makefile"
-                 (("#!/bin/sh") (string-append "#!" bash "/bin/bash"))))))
-         (add-after 'configure 'remove-complex
-           (lambda _
-             (delete-file-recursively "src/complex"))))))))
+       #:phases
+       #~(modify-phases %standard-phases
+           (add-before 'build 'patch-shebang-in-makefile
+             (lambda _
+               (let ((bash #$(this-package-native-input "bash")))
+                 (substitute* "Makefile"
+                   (("#!/bin/sh") (string-append "#!" bash "/bin/bash"))))))
+           (add-after 'configure 'remove-complex
+             (lambda _
+               (delete-file-recursively "src/complex"))))))))
 
+(define tcc-boot-musl
+  (package
+    (inherit tcc-boot)
+    (name "tcc-boot-musl")
+    (native-inputs
+      `(("libc" ,musl-boot0)
+        ("tcc" ,tcc-boot)
+        ,@(alist-delete "tcc" (package-native-inputs tcc-boot))))
+    (arguments
+      (substitute-keyword-arguments (package-arguments tcc-boot)
+        ((#:phases phases)
+         #~(modify-phases #$phases
+             (delete 'rebuild-libc.a)
+             (delete 'install-libc.a)
+             (delete 'rebuild-libgetopt.a)
+             (delete 'install-libgetopt.a)
+             (delete 'rebuild-crts)
+             (delete 'install-crts)
+             (delete 'install-extras)
+             (replace 'build
+               (lambda* (#:key outputs inputs #:allow-other-keys)
+                 (let* ((out (assoc-ref outputs "out"))
+                        (libc (assoc-ref inputs "libc"))
+                        (tcc (assoc-ref inputs "tcc"))
+                        (interpreter "/musl/loader"))
+                   (invoke
+                    "tcc"
+                    "-g"
+                    "-vvv"
+                    "-I" (string-append tcc "/include")
+                    "-L" (string-append tcc "/lib")
+                    "-D" "ONE_SOURCE=1"
+                    "-D" (string-append "TCC_TARGET_" (string-upcase #$(tcc-system)) "=1")
+                    "-D" "TCC_VERSION=\"0.9.28rc\""
+                    "-D" "CONFIG_TCC_STATIC=1"
+                    "-D" "CONFIG_USE_LIBGCC=1"
+                    "-D" "CONFIG_TCC_SEMLOCK=0"
+                    "-D" (string-append "CONFIG_TCCDIR=\"" out "/lib/tcc\"")
+                    "-D" (string-append "CONFIG_TCC_CRTPREFIX=\"" libc "/lib\"")
+                    "-D" (string-append "CONFIG_TCC_ELFINTERP=\"" interpreter "\"")
+                    "-D" (string-append "CONFIG_TCC_LIBPATHS=\"" libc "/lib" ":"
+                                                                 out "/lib" ":"
+                                                                 "{B}/lib:.\"")
+                    "-D" (string-append "CONFIG_TCC_SYSINCLUDEPATHS=\"" libc "/include" ":"
+                                                                        out "/include" ":"
+                                                                        "{B}/include\"")
+                    "-D" (string-append "TCC_LIBGCC=\"" libc "/lib/libc.a\"")
+                    "-o" "tcc"
+                    "tcc.c"))))))))))
+
+(define tcc-musl
+  (package
+    (inherit tcc-boot-musl)
+    (name "tcc-musl")
+    (native-inputs
+      `(("libc" ,musl-boot0)
+        ("tcc" ,tcc-boot-musl)
+        ,@(alist-delete "tcc" (package-native-inputs tcc-boot-musl))))
+    (arguments
+      (substitute-keyword-arguments (package-arguments tcc-boot-musl)
+        ((#:phases phases)
+         #~(modify-phases #$phases
+             (replace 'build
+               (lambda* (#:key outputs inputs #:allow-other-keys)
+                 (let* ((out (assoc-ref outputs "out"))
+                        (libc (assoc-ref inputs "libc"))
+                        (interpreter "/musl/loader"))
+                   (invoke
+                    "tcc"
+                    "-g"
+                    "-vvv"
+                    "-D" "REG_PC=0"
+                    "-D" "REG_S0=8"
+                    "-D" "ONE_SOURCE=1"
+                    "-D" (string-append "TCC_TARGET_" (string-upcase #$(tcc-system)) "=1")
+                    "-D" "TCC_VERSION=\"0.9.28rc\""
+                    "-D" "CONFIG_TCC_STATIC=1"
+                    "-D" "CONFIG_USE_LIBGCC=1"
+                    "-D" "CONFIG_TCC_SEMLOCK=0"
+                    "-D" (string-append "CONFIG_TCCDIR=\"" out "/lib/tcc\"")
+                    "-D" (string-append "CONFIG_TCC_CRTPREFIX=\"" libc "/lib\"")
+                    "-D" (string-append "CONFIG_TCC_ELFINTERP=\"" interpreter "\"")
+                    "-D" (string-append "CONFIG_TCC_LIBPATHS=\"" libc "/lib" ":"
+                                                                 out "/lib" ":"
+                                                                 "{B}/lib:.\"")
+                    "-D" (string-append "CONFIG_TCC_SYSINCLUDEPATHS=\"" libc "/include" ":"
+                                                                        out "/include" ":"
+                                                                        "{B}/include\"")
+                    "-D" (string-append "TCC_LIBGCC=\"" libc "/lib/libc.a\"")
+                    "-o" "tcc"
+                    "tcc.c"))))))))))
+
+(define (%boot-tcc-musl-inputs)
+  `(("gzip" ,gzip-mesboot)
+    ("patch" ,patch-mesboot)
+    ("tcc" ,tcc-musl)
+    ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
 
 
 (define binutils-mesboot0
@@ -1113,7 +1211,7 @@ MesCC-Tools), and finally M2-Planet.")
                  "1sp9g7zrrcsl25hxiqzmmcrdlbm7rbmj0vki18lks28wblcm0f4c")))))
     (inputs '())
     (propagated-inputs '())
-    (native-inputs (%boot-tcc-inputs))
+    (native-inputs (%boot-tcc-musl-inputs))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (arguments
      (list #:implicit-inputs? #f
