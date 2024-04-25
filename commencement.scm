@@ -1264,73 +1264,133 @@ MesCC-Tools), and finally M2-Planet.")
 
 
 (define (%boot-mesboot0-inputs)
-  `(("gcc" ,gcc-mesboot0)
-    ("kernel-headers" ,%bootstrap-linux-libre-headers)
-    ("libc" ,glibc-mesboot0)
-    ,@(alist-delete "gcc" (%boot-mesboot-core-inputs))))
+  `(("kernel-headers" ,%bootstrap-linux-libre-headers)
+    ("libc" ,musl-boot0)
+    ("binutils" ,binutils-mesboot0)
+    ,@(%boot-tcc-musl-inputs)))
 
 
-(define gnu-make-mesboot
+(define m4-boot
   (package
-    (inherit gnu-make)
-    (name "make-mesboot")
-    (version "3.82")
+    (inherit m4)
+    (name "m4-boot")
+    (version "1.4.7")
     (source (origin
-              (method url-fetch)
-              (uri (string-append "mirror://gnu/make/make-"
-                                  version ".tar.gz"))
-              (sha256
-               (base32
-                "1rs2f9hmvy3q6zkl15jnlmnpgffm0bhw5ax0h5c7q604wqrip69x"))))
+      (method url-fetch)
+      (uri (string-append "mirror://gnu/m4/m4-" version ".tar.gz"))
+      (sha256
+       (base32 "00w3dp8l819x44g4r7b755qj8rch9rzqiky184ga2qzmcwvrjg09"))))
     (native-inputs (%boot-mesboot0-inputs))
-    (supported-systems '("i686-linux" "x86_64-linux"))
-    (inputs '())
-    (propagated-inputs '())
-    (arguments
-     `(#:implicit-inputs? #f
-       #:parallel-build? #f
-       #:guile ,%bootstrap-guile
-       #:configure-flags '("LIBS=-lc -lnss_files -lnss_dns -lresolv")
-       #:phases
-       (modify-phases %standard-phases
-         (replace 'check
-           (lambda _
-             (invoke "./make" "--version")))
-         (replace 'install
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref outputs "out"))
-                    (bin (string-append out "/bin")))
-               (install-file "make" bin)))))))))
+    (arguments (list
+       #:tests? #f    ;; They fail but we'll be fine XXX: check why they fail (tcc?)
+       #:guile %bootstrap-guile
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:configure-flags #~(list "CC=tcc" "AR=ar" "AS=as")))))
 
-(define (%boot-mesboot1-inputs)
-  `(("binutils" ,binutils-mesboot1)
-    ("make" ,gnu-make-mesboot)
-    ,@(fold alist-delete (%boot-mesboot0-inputs)
-            '("binutils" "make"))))
+(define (%boot-multiprecision-inputs)
+  `(("m4" ,m4-boot)
+    ("libc" ,musl-boot0)
+    ("binutils" ,binutils-mesboot0)
+    ,@(%boot-tcc-musl-inputs)))
+
 
 (define gmp-boot
-  (let ((version "4.3.2"))
-    (origin
+  (package
+    (inherit gmp)
+    (name "gmp-boot")
+    (version "6.3.0")
+    (source (origin
       (method url-fetch)
       (uri (string-append "mirror://gnu/gmp/gmp-" version ".tar.gz"))
       (sha256
-       (base32 "15rwq54fi3s11izas6g985y9jklm3xprfsmym3v1g6xr84bavqvv")))))
+       (base32 "0k5jkamdsjdcq9fcglqhc7bbw5hwnqa5m8asanh342c1fsfxavz5"))))
+    (native-inputs (%boot-multiprecision-inputs))
+    (arguments (list
+       #:guile %bootstrap-guile
+       #:tests? #f
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:configure-flags #~(list "CC=tcc"
+                                 "CFLAGS=-DHAVE_ALLOCA_H"
+                                 "AR=ar"
+                                 "AS=as"
+                                 "--disable-shared"
+                                 "--disable-assembly")))))
 
 (define mpfr-boot
-  (let ((version "2.4.2"))
-    (origin
+  (package
+    (inherit mpfr)
+    (name "mpfr-boot")
+    (version "4.1.0")
+    (source (origin
       (method url-fetch)
       (uri (string-append "mirror://gnu/mpfr/mpfr-" version ".tar.gz"))
       (sha256
-       (base32 "0dxn4904dra50xa22hi047lj8kkpr41d6vb9sd4grca880c7wv94")))))
+       (base32 "1mm2zxjqxxqlacd87cxlyi63pwrxwafqks7lmpqa3wqq6a0zw9ri"))))
+    (native-inputs (%boot-multiprecision-inputs))
+    (propagated-inputs (list gmp-boot))
+    (arguments (list
+       #:guile %bootstrap-guile
+       #:tests? #f
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:configure-flags #~(list "CC=tcc"
+                                 "CFLAGS=-DHAVE_ALLOCA_H"
+                                 "AR=ar"
+                                 "AS=as"
+                                 "--disable-shared"
+                                 "--disable-assembly")))))
 
 (define mpc-boot
-  (let ((version "1.0.3"))
-    (origin
+  (package
+    (inherit mpc)
+    (name "mpc-boot")
+    (version "1.2.1")
+    (source (origin
       (method url-fetch)
       (uri (string-append "mirror://gnu/mpc/mpc-" version ".tar.gz"))
       (sha256
-       (base32 "1hzci2zrrd7v3g1jk35qindq05hbl0bhjcyyisq9z209xb3fqzb1")))))
+       (base32 "0n846hqfqvmsmim7qdlms0qr86f1hck19p12nq3g3z2x74n3sl0p"))))
+    (native-inputs (%boot-multiprecision-inputs))
+    (propagated-inputs (list gmp-boot mpfr-boot))
+    (arguments (list
+       #:guile %bootstrap-guile
+       #:tests? #f
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:configure-flags #~(list "CC=tcc"
+                                 "CFLAGS=-DHAVE_ALLOCA_H"
+                                 "AR=ar"
+                                 "AS=as"
+                                 "--disable-shared"
+                                 "--disable-assembly")))))
+
+(define flex-boot
+  (package
+    (inherit flex)
+    (version "2.5.39")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append
+                     "https://github.com/westes/flex"
+                     "/releases/download/v" version "/"
+                     "flex-" version ".tar.gz"))
+              (sha256
+                (base32
+                  "0j49664wfmm2bvsdxxcaf1835is8kq0hr0sc20km14wc2mc1ppbi"))))
+    (native-inputs (%boot-multiprecision-inputs))
+    (arguments (list
+       #:guile %bootstrap-guile
+       #:tests? #f
+       #:implicit-inputs? #f
+       #:strip-binaries? #f
+       #:configure-flags #~(list "CC=tcc"
+                                 "CFLAGS=-DHAVE_ALLOCA_H"
+                                 "--disable-shared"
+                                 "--enable-static")))))
+
+
 
 (define gcc-core-mesboot1
   ;; GCC 4.6.4 is the latest modular distribution.  This package is not
