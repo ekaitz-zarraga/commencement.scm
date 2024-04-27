@@ -1243,7 +1243,7 @@ MesCC-Tools), and finally M2-Planet.")
                  "MAKEINFO=true"
                  "RANLIB=true"
                  "CC=tcc -static -g"
-                 "LD=tcc -g"
+                 "LD=tcc -static -g"
                  "--enable-64-bit-bfd"
                  "--disable-nls"
                  "--disable-shared"
@@ -1386,32 +1386,36 @@ MesCC-Tools), and finally M2-Planet.")
        #:implicit-inputs? #f
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc"
+                                 "LD=tcc -static"
+                                 "CC_FOR_BUILD=tcc"
                                  "CFLAGS=-DHAVE_ALLOCA_H"
                                  "--disable-shared"
                                  "--enable-static")))))
 
 
-
 (define gcc-core-mesboot1
-  ;; GCC 4.6.4 is the latest modular distribution.  This package is not
-  ;; stricly needed, but very helpful for development because it builds
-  ;; relatively fast.  If this configures and builds then gcc-mesboot1 also
-  ;; builds.
+  ;; GCC 4.6.4 is the latest modular distribution. We backported RISC-V support
+  ;; here.
   (package
-    (inherit gcc-mesboot0)
+    (inherit gcc)
     (name "gcc-core-mesboot1")
     (version "4.6.4")
     (source (origin
-              (method url-fetch)
-              (uri (string-append "mirror://gnu/gcc/gcc-"
-                                  version "/gcc-core-" version ".tar.gz"))
-              (sha256
-               (base32
-                "173kdb188qg79pcz073cj9967rs2vzanyjdjyxy9v0xb0p5sad75"))))
-    (inputs `(("gmp-source" ,gmp-boot)
-              ("mpfr-source" ,mpfr-boot)
-              ("mpc-source" ,mpc-boot)))
-    (native-inputs (%boot-mesboot1-inputs))
+                (method git-fetch)
+                (uri (git-reference
+                       (url "https://github.com/ekaitz-zarraga/gcc/")
+                       (commit "riscv"))) ;; TODO: use version here
+                (sha256
+                  (base32
+                    "0mv5ap8vlp4prybp47hc3mp9k20imx9wvvlv4y8dvzrnjvnr7d98"))))
+    (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
+    (inputs `(("flex" ,flex)   ;; TODO: bootstrap me
+              ("bison" ,bison) ;; TODO: bootstrap me
+              ("gmp" ,gmp-boot)
+              ("mpfr" ,mpfr-boot)
+              ("mpc" ,mpc-boot)))
+    (outputs '("out"))
+    (native-inputs (%boot-mesboot0-inputs))
     (arguments
      (list #:implicit-inputs? #f
            #:guile %bootstrap-guile
@@ -1420,21 +1424,12 @@ MesCC-Tools), and finally M2-Planet.")
                        (guix build utils)
                        (srfi srfi-1))
            #:parallel-build? #f             ; for debugging
-           #:make-flags
-           #~(let* ((libc (assoc-ref %build-inputs "libc"))
-                    (ldflags (string-append
-                              "-B" libc "/lib "
-                              "-Wl,-dynamic-linker "
-                              "-Wl," libc
-                              #$(glibc-dynamic-linker "i686-linux"))))
-               (list (string-append "LDFLAGS=" ldflags)
-                     (string-append "LDFLAGS_FOR_TARGET=" ldflags)))
            #:configure-flags
            #~(let ((out (assoc-ref %outputs "out"))
                    (glibc (assoc-ref %build-inputs "libc")))
                (list (string-append "--prefix=" out)
-                     "--build=i686-unknown-linux-gnu"
-                     "--host=i686-unknown-linux-gnu"
+                     (string-append "--build=" #$(%current-system))
+                     (string-append "--host="  #$(%current-system))
                      (string-append "--with-native-system-header-dir=" glibc "/include")
                      (string-append "--with-build-sysroot=" glibc "/include")
                      "--disable-bootstrap"
@@ -1461,58 +1456,39 @@ MesCC-Tools), and finally M2-Planet.")
                      "--disable-build-with-cxx"))
            #:phases
            #~(modify-phases %standard-phases
-               (add-after 'unpack 'apply-boot-patch
+               (add-after 'unpack 'fix-alloca
                  (lambda* (#:key inputs #:allow-other-keys)
-                   (let ((patch-file
-                          #$(local-file
-                             (search-patch "gcc-boot-4.6.4.patch"))))
-                     (invoke "patch" "--force" "-p1" "-i" patch-file))))
-               ;; c&p from commencement.scm:gcc-boot0
-               (add-after 'unpack 'unpack-gmp&co
-                 (lambda* (#:key inputs #:allow-other-keys)
-                   (let ((gmp  (assoc-ref %build-inputs "gmp-source"))
-                         (mpfr (assoc-ref %build-inputs "mpfr-source"))
-                         (mpc  (assoc-ref %build-inputs "mpc-source")))
-
-                     ;; To reduce the set of pre-built bootstrap inputs, build
-                     ;; GMP & co. from GCC.
-                     (for-each (lambda (source)
-                                 (or (invoke "tar" "xvf" source)
-                                     (error "failed to unpack tarball"
-                                            source)))
-                               (list gmp mpfr mpc))
-
-                     ;; Create symlinks like `gmp' -> `gmp-x.y.z'.
-                     #$@(map (lambda (lib package)
-                               ;; Drop trailing letters, as gmp-6.0.0a unpacks
-                               ;; into gmp-6.0.0.
-                               #~(symlink #$(string-trim-right
-                                             (basename
-                                              (origin-actual-file-name lib)
-                                              ".tar.gz")
-                                             char-set:letter)
-                                          #$package))
-                             (list gmp-boot mpfr-boot mpc-boot)
-                             '("gmp" "mpfr" "mpc")))))
+                   (substitute* (list "libiberty/alloca.c"
+                                      "include/libiberty.h")
+                     (("C_alloca") "alloca"))))
                (add-before 'configure 'setenv
                  (lambda* (#:key outputs #:allow-other-keys)
                    (let* ((out (assoc-ref outputs "out"))
                           (binutils (assoc-ref %build-inputs "binutils"))
                           (bash (assoc-ref %build-inputs "bash"))
-                          (gcc (assoc-ref %build-inputs "gcc"))
-                          (glibc (assoc-ref %build-inputs "libc"))
-                          (kernel-headers (assoc-ref %build-inputs "kernel-headers")))
+                          (tcc (assoc-ref %build-inputs "tcc"))
+                          (glibc (assoc-ref %build-inputs "libc")))
+                     (setenv "CC" "tcc")
+                     (setenv "AR" "ar")
+                     (setenv "AS" "as")
+                     (setenv "CFLAGS" "-D HAVE_ALLOCA_H")
                      (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
-                     (setenv "C_INCLUDE_PATH" (string-append
-                                               gcc "/lib/gcc-lib/i686-unknown-linux-gnu/2.95.3/include"
-                                               ":" kernel-headers "/include"
-                                               ":" glibc "/include"
-                                               ":" (getcwd) "/mpfr/src"))
-                     (setenv "LIBRARY_PATH" (string-append glibc "/lib"
-                                                           ":" gcc "/lib"))
+                     (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
+                                               ":" glibc "/include"))
+                     (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
+                                                           ":" glibc "/lib"
+                                                           ":" tcc "/lib"))
                      (format (current-error-port) "C_INCLUDE_PATH=~a\n" (getenv "C_INCLUDE_PATH"))
                      (format (current-error-port) "LIBRARY_PATH=~a\n"
-                             (getenv "LIBRARY_PATH"))))))))))
+                             (getenv "LIBRARY_PATH"))))))))
+    (native-search-paths
+      (list (search-path-specification
+              (variable "C_INCLUDE_PATH")
+              (files '("include")))
+            (search-path-specification
+              (variable "LIBRARY_PATH")
+              (files '("lib")))))))
+
 
 (define gcc-mesboot1
   (package
