@@ -1087,6 +1087,11 @@ MesCC-Tools), and finally M2-Planet.")
                  "--disable-gcc-wrapper"))
        #:phases
        #~(modify-phases %standard-phases
+           (add-before 'build 'add-libg
+             (lambda _
+               (substitute* "Makefile"
+                   (("(EMPTY_LIB_NAMES = )(.*)" all var content)
+                    (string-append var "g " content)))))
            (add-before 'build 'patch-shebang-in-makefile
              (lambda _
                (let ((bash #$(this-package-native-input "bash")))
