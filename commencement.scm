@@ -498,7 +498,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "10dpgvvrj0p3c0fl2mm9r0d4diz0dx9i6gbv098502sjmqgf35ra")))
+                    "0fiml0yk257c3qhzwsainlfvhzrql9nkvpjjjwa865xk828pq08k")))
             #;(origin
               (method url-fetch)
               (uri (list
@@ -840,7 +840,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "18gpgix6qja5nayqpnbwmfwmfs10xmxnvdq3919842pl052a6qv5")))
+                    "02iamac1mvmlyg0x35x2c0gzqd82lcw0vbpwzz7ibjpz3940q20z")))
       #;(origin
               (method url-fetch)
               (uri (string-append "mirror://savannah/tinycc/tcc-"
@@ -1412,7 +1412,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (commit "riscv"))) ;; TODO: use version here
                 (sha256
                   (base32
-                    "0mv5ap8vlp4prybp47hc3mp9k20imx9wvvlv4y8dvzrnjvnr7d98"))))
+                    "1n6j6nq2zgzcp1p955rcw7clj1xxdn3ap3p3mz41bcs5k26z8lxn"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs `(("flex" ,flex)   ;; TODO: bootstrap me
               ("bison" ,bison) ;; TODO: bootstrap me
@@ -1466,6 +1466,16 @@ MesCC-Tools), and finally M2-Planet.")
                    (substitute* (list "libiberty/alloca.c"
                                       "include/libiberty.h")
                      (("C_alloca") "alloca"))))
+               (add-after 'unpack 'patch-for-modern-libc
+                 ;; https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81712
+                 ;; TODO: Make this dependant on the glibc version in the build.
+                 (lambda _
+                   (for-each
+                     (lambda (dir)
+                       (substitute* (string-append "gcc/config/"
+                                                   dir "/linux-unwind.h")
+                                    (("struct ucontext") "ucontext_t")))
+                     '("alpha" "bfin" "i386" "pa" "sh" "xtensa" "riscv"))))
                (add-before 'configure 'setenv
                  (lambda* (#:key outputs #:allow-other-keys)
                    (let* ((out (assoc-ref outputs "out"))
