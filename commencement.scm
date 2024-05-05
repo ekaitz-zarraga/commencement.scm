@@ -831,7 +831,7 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit tcc-boot0)
     (name "tcc-boot")
-    (version "mob-riscv-bootstrap")
+    (version "mob")
     (source (origin
                 (method git-fetch)
                 (uri (git-reference
@@ -840,7 +840,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "02iamac1mvmlyg0x35x2c0gzqd82lcw0vbpwzz7ibjpz3940q20z")))
+                    "031fs6nl123qfy76hfcc16g7jp3islmvdbx8by0yzjz6qqw2g4av")))
       #;(origin
               (method url-fetch)
               (uri (string-append "mirror://savannah/tinycc/tcc-"
@@ -860,6 +860,11 @@ MesCC-Tools), and finally M2-Planet.")
        #:strip-binaries? #f             ; no strip yet
        #:phases
        (modify-phases %standard-phases
+         (add-before 'configure 'make-static
+           (lambda _
+             (substitute* "libtcc.c"
+               (("s->nocommon = 1;" all)
+                (string-append all " s->static_link = 1;")))))
          (replace 'configure
            (lambda* (#:key outputs #:allow-other-keys)
              (call-with-output-file
@@ -919,11 +924,11 @@ MesCC-Tools), and finally M2-Planet.")
              (let* ((out (assoc-ref outputs "out"))
                     (tcc (assoc-ref inputs "tcc")))
                (invoke "./tcc" "-g" "-vvv"
-                      "-c" "-o" "libc.o"
-                      "-I" (string-append tcc "/include")
-                      "-I" (string-append tcc "/include/linux/" ,(mes-system))
-                      "-I" "include"
-                      (string-append tcc "/share/libc.c"))
+                       "-c" "-o" "libc.o"
+                       "-I" (string-append tcc "/include")
+                       "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                       "-I" "include"
+                       (string-append tcc "/share/libc.c"))
                (invoke "./tcc" "-ar" "rc" "libc.a" "libc.o"))))
 
         (add-after 'rebuild-libc.a 'rebuild-libgetopt.a
@@ -931,11 +936,11 @@ MesCC-Tools), and finally M2-Planet.")
             (let* ((out (assoc-ref outputs "out"))
                    (tcc (assoc-ref inputs "tcc")))
               (invoke "./tcc" "-g" "-vvv"
-                     "-c" "-o" "libgetopt.o"
-                     "-I" (string-append tcc "/include")
-                     "-I" (string-append tcc "/include/linux/" ,(mes-system))
-                     "-I" "include"
-                     (string-append tcc "/share/libgetopt.c"))
+                      "-c" "-o" "libgetopt.o"
+                      "-I" (string-append tcc "/include")
+                      "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                      "-I" "include"
+                      (string-append tcc "/share/libgetopt.c"))
               (invoke "./tcc" "-ar" "rc" "libgetopt.a" "libgetopt.o"))))
 
         (add-after 'rebuild-libgetopt.a 'rebuild-crts
@@ -943,11 +948,11 @@ MesCC-Tools), and finally M2-Planet.")
             (let* ((out (assoc-ref outputs "out"))
                    (tcc (assoc-ref inputs "tcc")))
               (invoke "./tcc" "-g" "-vvv"
-                     "-c" "-o" "crt1.o"
-                     "-I" (string-append tcc "/include")
-                     "-I" (string-append tcc "/include/linux/" ,(mes-system))
-                     "-I" "include"
-                     (string-append tcc "/share/crt1.c"))
+                      "-c" "-o" "crt1.o"
+                      "-I" (string-append tcc "/include")
+                      "-I" (string-append tcc "/include/linux/" ,(mes-system))
+                      "-I" "include"
+                      (string-append tcc "/share/crt1.c"))
               ;; These are empty
               (copy-file (string-append tcc "/lib/crti.o") "crti.o")
               (copy-file (string-append tcc "/lib/crtn.o") "crtn.o"))))
@@ -1076,12 +1081,13 @@ MesCC-Tools), and finally M2-Planet.")
        #~(list
            (string-append "SHELL=" #$(this-package-native-input "bash")
                           "/bin/bash")
+           "CC=tcc"
            "AR=tcc -ar"
            "RANLIB=true"
            "CFLAGS=-DSYSCALL_NO_TLS -D__riscv_float_abi_soft -U__riscv_flen")
        #:configure-flags
        #~(let ((bash #$(this-package-native-input "bash")))
-           (list "CC=tcc -static"
+           (list "CC=tcc"
                  (string-append "CONFIG_SHELL=" bash "/bin/sh")
                  "--disable-shared"
                  "--disable-gcc-wrapper"))
@@ -1244,13 +1250,14 @@ MesCC-Tools), and finally M2-Planet.")
            #~(let ((bash (assoc-ref %build-inputs "bash")))
                `(,(string-append "CONFIG_SHELL=" bash "/bin/sh")
                  "CFLAGS=-g"
+                 "CC=tcc"
+                 "LD=tcc"
                  "AR=tcc -ar"
                  "MAKEINFO=true"
                  "RANLIB=true"
-                 "CC=tcc -static -g"
-                 "LD=tcc -static -g"
                  "--enable-64-bit-bfd"
                  "--disable-nls"
+                 "--enable-static"
                  "--disable-shared"
                  "--disable-werror"
                  "--disable-plugins"
@@ -1318,8 +1325,7 @@ MesCC-Tools), and finally M2-Planet.")
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc"
                                  "CFLAGS=-DHAVE_ALLOCA_H"
-                                 "AR=ar"
-                                 "AS=as"
+                                 "--enable-static"
                                  "--disable-shared"
                                  "--disable-assembly")))))
 
@@ -1342,8 +1348,7 @@ MesCC-Tools), and finally M2-Planet.")
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc"
                                  "CFLAGS=-DHAVE_ALLOCA_H"
-                                 "AR=ar"
-                                 "AS=as"
+                                 "--enable-static"
                                  "--disable-shared"
                                  "--disable-assembly")))))
 
@@ -1366,8 +1371,7 @@ MesCC-Tools), and finally M2-Planet.")
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc"
                                  "CFLAGS=-DHAVE_ALLOCA_H"
-                                 "AR=ar"
-                                 "AS=as"
+                                 "--enable-static"
                                  "--disable-shared"
                                  "--disable-assembly")))))
 
@@ -1391,7 +1395,6 @@ MesCC-Tools), and finally M2-Planet.")
        #:implicit-inputs? #f
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc"
-                                 "LD=tcc -static"
                                  "CC_FOR_BUILD=tcc"
                                  "CFLAGS=-DHAVE_ALLOCA_H"
                                  "--disable-shared"
