@@ -1206,11 +1206,11 @@ MesCC-Tools), and finally M2-Planet.")
     ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
 
 
-(define binutils-mesboot0
+(define binutils-muslboot0
   ;; The initial Binutils
   (package
     (inherit binutils)
-    (name "binutils-mesboot0")
+    (name "binutils-muslboot0")
     (version "2.30")
     (source (bootstrap-origin
              (origin
@@ -1275,10 +1275,10 @@ MesCC-Tools), and finally M2-Planet.")
                                     (%current-system)))))))))))
 
 
-(define (%boot-mesboot0-inputs)
+(define (%boot-muslboot0-inputs)
   `(("kernel-headers" ,%bootstrap-linux-libre-headers)
     ("libc" ,musl-boot0)
-    ("binutils" ,binutils-mesboot0)
+    ("binutils" ,binutils-muslboot0)
     ,@(%boot-tcc-musl-inputs)))
 
 
@@ -1292,7 +1292,7 @@ MesCC-Tools), and finally M2-Planet.")
       (uri (string-append "mirror://gnu/m4/m4-" version ".tar.gz"))
       (sha256
        (base32 "00w3dp8l819x44g4r7b755qj8rch9rzqiky184ga2qzmcwvrjg09"))))
-    (native-inputs (%boot-mesboot0-inputs))
+    (native-inputs (%boot-muslboot0-inputs))
     (arguments (list
        #:tests? #f    ;; They fail but we'll be fine XXX: check why they fail (tcc?)
        #:guile %bootstrap-guile
@@ -1303,7 +1303,7 @@ MesCC-Tools), and finally M2-Planet.")
 (define (%boot-multiprecision-inputs)
   `(("m4" ,m4-boot)
     ("libc" ,musl-boot0)
-    ("binutils" ,binutils-mesboot0)
+    ("binutils" ,binutils-muslboot0)
     ,@(%boot-tcc-musl-inputs)))
 
 
@@ -1401,12 +1401,12 @@ MesCC-Tools), and finally M2-Planet.")
                                  "--enable-static")))))
 
 
-(define gcc-core-mesboot1
+(define gcc-core-muslboot0
   ;; GCC 4.6.4 is the latest modular distribution. We backported RISC-V support
   ;; here.
   (package
     (inherit gcc)
-    (name "gcc-core-mesboot1")
+    (name "gcc-core-muslboot0")
     (version "4.6.4")
     (source (origin
                 (method git-fetch)
@@ -1423,7 +1423,7 @@ MesCC-Tools), and finally M2-Planet.")
               ("mpfr" ,mpfr-boot)
               ("mpc" ,mpc-boot)))
     (outputs '("out"))
-    (native-inputs (%boot-mesboot0-inputs))
+    (native-inputs (%boot-muslboot0-inputs))
     (arguments
      (list #:implicit-inputs? #f
            #:guile %bootstrap-guile
@@ -1507,11 +1507,123 @@ MesCC-Tools), and finally M2-Planet.")
               (variable "LIBRARY_PATH")
               (files '("lib")))))))
 
-
-(define gcc-mesboot1
+(define musl-boot
   (package
-    (inherit gcc-core-mesboot1)
-    (name "gcc-mesboot1")
+    (inherit musl)
+    (name "musl-boot")
+    (native-inputs `(("gcc" ,gcc-core-muslboot0)
+                     ("binutils" ,binutils-muslboot0)
+                    ,@(package-native-inputs musl-boot0)))
+    (arguments
+     (substitute-keyword-arguments (package-arguments musl-boot0)
+       ((#:make-flags _)
+        #~(list (string-append "SHELL=" #$(this-package-native-input "bash")
+                          "/bin/bash")
+                "RANLIB=true"))
+       ((#:configure-flags _)
+        #~(list (string-append "CONFIG_SHELL="
+                               #$(this-package-native-input "bash")
+                               "/bin/sh")
+                "CC=gcc"
+                "--disable-shared"))))))
+
+
+(define gcc-core-muslboot
+  ;; GCC 4.6.4 is the latest modular distribution. We backported RISC-V support
+  ;; here.
+  (package
+    (inherit gcc-core-muslboot0)
+    (name "gcc-core-muslboot")
+    (inputs `(("gcc" ,gcc-core-muslboot0)
+              ("libc" ,musl-boot)
+             ,@(alist-delete "libc" (package-inputs gcc-core-muslboot0))))
+    (arguments
+     (list #:implicit-inputs? #f
+           #:guile %bootstrap-guile
+           #:tests? #f
+           #:modules '((guix build gnu-build-system)
+                       (guix build utils)
+                       (srfi srfi-1))
+           #:parallel-build? #f             ; for debugging
+           #:configure-flags
+           #~(let ((out (assoc-ref %outputs "out"))
+                   (glibc (assoc-ref %build-inputs "libc")))
+               (list (string-append "--prefix=" out)
+                     (string-append "--build=" #$(%current-system))
+                     (string-append "--host="  #$(%current-system))
+                     (string-append "--with-native-system-header-dir=" glibc "/include")
+                     (string-append "--with-build-sysroot=" glibc "/include")
+                     "--disable-bootstrap"
+                     "--disable-decimal-float"
+                     "--disable-libatomic"
+                     "--disable-libcilkrts"
+                     "--disable-libgomp"
+                     "--disable-libitm"
+                     "--disable-libmudflap"
+                     "--disable-libquadmath"
+                     "--disable-libsanitizer"
+                     "--disable-libssp"
+                     "--disable-libvtv"
+                     "--disable-lto"
+                     "--disable-lto-plugin"
+                     "--disable-multilib"
+                     "--disable-plugin"
+                     "--disable-threads"
+                     "--enable-languages=c,c++"
+                     "--enable-static"
+                     "--disable-shared"
+                     "--enable-threads=single"
+                     "--disable-libstdcxx-pch"
+                     "--disable-build-with-cxx"))
+           #:phases
+           #~(modify-phases %standard-phases
+               (add-after 'unpack 'fix-alloca
+                 (lambda* (#:key inputs #:allow-other-keys)
+                   (substitute* (list "libiberty/alloca.c"
+                                      "include/libiberty.h")
+                     (("C_alloca") "alloca"))))
+               (add-after 'unpack 'patch-for-modern-libc
+                 ;; https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81712
+                 ;; TODO: Make this dependant on the glibc version in the build.
+                 (lambda _
+                   (for-each
+                     (lambda (dir)
+                       (substitute* (string-append "gcc/config/"
+                                                   dir "/linux-unwind.h")
+                                    (("struct ucontext") "ucontext_t")))
+                     '("alpha" "bfin" "i386" "pa" "sh" "xtensa" "riscv"))))
+               (add-before 'configure 'setenv
+                 (lambda* (#:key outputs #:allow-other-keys)
+                   (let* ((out (assoc-ref outputs "out"))
+                          (binutils (assoc-ref %build-inputs "binutils"))
+                          (bash (assoc-ref %build-inputs "bash"))
+                          (gcc (assoc-ref %build-inputs "gcc"))
+                          (glibc (assoc-ref %build-inputs "libc")))
+                     (setenv "CC" "gcc -g") ;; TODO REMOVE Debug for the genmddeps
+                     (setenv "AR" "ar")
+                     (setenv "AS" "as")
+                     (setenv "CFLAGS" "-D HAVE_ALLOCA_H")
+                     (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
+                     (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
+                                               ":" glibc "/include"))
+                     (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
+                                                           ":" glibc "/lib"
+                                                           ":" gcc "/lib"))
+                     (format (current-error-port) "C_INCLUDE_PATH=~a\n" (getenv "C_INCLUDE_PATH"))
+                     (format (current-error-port) "LIBRARY_PATH=~a\n"
+                             (getenv "LIBRARY_PATH"))))))))
+    (native-search-paths
+      (list (search-path-specification
+              (variable "C_INCLUDE_PATH")
+              (files '("include")))
+            (search-path-specification
+              (variable "LIBRARY_PATH")
+              (files '("lib")))))))
+
+(define gcc-muslboot
+  (package
+    (inherit gcc-core-muslboot)
+    (name "gcc-muslboot")
     (version "4.6.4")
     (native-inputs
      `(("gcc-g++"
@@ -1522,9 +1634,10 @@ MesCC-Tools), and finally M2-Planet.")
            (sha256
             (base32
              "1fqqk5zkmdg4vmqzdmip9i42q6b82i3f6yc0n86n9021cr7ms2k9"))))
-       ,@(package-native-inputs gcc-core-mesboot1)))
+       ("gcc" ,gcc-core-muslboot0)
+       ,@(package-native-inputs gcc-core-muslboot0)))
     (arguments
-     (substitute-keyword-arguments (package-arguments gcc-core-mesboot1)
+     (substitute-keyword-arguments (package-arguments gcc-core-muslboot0)
        ((#:configure-flags configure-flags)
         #~(let ((out (assoc-ref %outputs "out")))
             `("--enable-languages=c,c++"
@@ -1550,17 +1663,17 @@ MesCC-Tools), and finally M2-Planet.")
                 ;; libstdc++ is being compiled.
                 (setenv "CPLUS_INCLUDE_PATH" (getenv "C_INCLUDE_PATH"))))))))))
 
-(define (%boot-mesboot2-inputs)
-  `(("gcc" ,gcc-mesboot1)
-    ,@(alist-delete "gcc" (%boot-mesboot1-inputs))))
+(define (%boot-muslboot-inputs)
+  `(("gcc" ,gcc-muslboot)
+    ,@(alist-delete "gcc" (%boot-muslboot0-inputs))))
 
-(define hello-mesboot
+(define hello-muslboot
   ;; Check for Scheme-only bootstrap.  Note that newer versions of Hello
   ;; break due to the way that newer versions of Gnulib handle
   ;; "limits.h".  Hence, we stick to 2.10.
   (package
     (inherit hello)
-    (name "hello-mesboot")
+    (name "hello-muslboot")
     (version "2.10")
     (source
      (origin
@@ -1573,7 +1686,7 @@ MesCC-Tools), and finally M2-Planet.")
     (supported-systems '("i686-linux" "x86_64-linux"))
     (inputs '())
     (propagated-inputs '())
-    (native-inputs (%boot-mesboot2-inputs))
+    (native-inputs (%boot-muslboot-inputs))
     (arguments
      `(#:implicit-inputs? #f
        #:guile ,%bootstrap-guile
@@ -1586,42 +1699,3 @@ MesCC-Tools), and finally M2-Planet.")
          (replace 'check
            (lambda _
              (invoke "./hello"))))))))
-
-
-;; Sadly we have to introduce Gawk here.  The "versions.awk" script of
-;; glibc 2.16.0 is too complicated for Gash-Utils.  This is the version
-;; of Gawk used previously during bootstrap.  It's possible that a newer
-;; version would work, too, but this one was already ready to go.
-(define gawk-mesboot
-  (package
-    (inherit gawk)
-    (name "gawk-mesboot")
-    (version "3.1.8")
-    (source (origin
-              (method url-fetch)
-              (uri (string-append "mirror://gnu/gawk/gawk-"
-                                  version ".tar.gz"))
-              (sha256
-               (base32
-                "03d5y7jabq7p2s7ys9alay9446mm7i5g2wvy8nlicardgb6b6ii1"))))
-    (native-inputs (%boot-mesboot2-inputs))
-    (supported-systems '("i686-linux" "x86_64-linux"))
-    (inputs '())
-    (propagated-inputs '())
-    (arguments
-     `(#:implicit-inputs? #f
-       #:parallel-build? #f
-       #:guile ,%bootstrap-guile
-       #:configure-flags '("ac_cv_func_connect=no")
-       #:make-flags '("gawk")
-       #:phases
-       (modify-phases %standard-phases
-         (replace 'check
-           (lambda _
-             (invoke "./gawk" "--version")))
-         (replace 'install
-           (lambda* (#:key outputs #:allow-other-keys)
-             (let* ((out (assoc-ref outputs "out"))
-                    (bin (string-append out "/bin")))
-               (install-file "gawk" bin)
-               (symlink "gawk" (string-append bin "/awk"))))))))))
