@@ -1538,87 +1538,25 @@ MesCC-Tools), and finally M2-Planet.")
               ("libc" ,musl-boot)
              ,@(alist-delete "libc" (package-inputs gcc-core-muslboot0))))
     (arguments
-     (list #:implicit-inputs? #f
-           #:guile %bootstrap-guile
-           #:tests? #f
-           #:modules '((guix build gnu-build-system)
-                       (guix build utils)
-                       (srfi srfi-1))
-           #:parallel-build? #f             ; for debugging
-           #:configure-flags
-           #~(let ((out (assoc-ref %outputs "out"))
-                   (glibc (assoc-ref %build-inputs "libc")))
-               (list (string-append "--prefix=" out)
-                     (string-append "--build=" #$(%current-system))
-                     (string-append "--host="  #$(%current-system))
-                     (string-append "--with-native-system-header-dir=" glibc "/include")
-                     (string-append "--with-build-sysroot=" glibc "/include")
-                     "--disable-bootstrap"
-                     "--disable-decimal-float"
-                     "--disable-libatomic"
-                     "--disable-libcilkrts"
-                     "--disable-libgomp"
-                     "--disable-libitm"
-                     "--disable-libmudflap"
-                     "--disable-libquadmath"
-                     "--disable-libsanitizer"
-                     "--disable-libssp"
-                     "--disable-libvtv"
-                     "--disable-lto"
-                     "--disable-lto-plugin"
-                     "--disable-multilib"
-                     "--disable-plugin"
-                     "--disable-threads"
-                     "--enable-languages=c,c++"
-                     "--enable-static"
-                     "--disable-shared"
-                     "--enable-threads=single"
-                     "--disable-libstdcxx-pch"
-                     "--disable-build-with-cxx"))
-           #:phases
-           #~(modify-phases %standard-phases
-               (add-after 'unpack 'fix-alloca
-                 (lambda* (#:key inputs #:allow-other-keys)
-                   (substitute* (list "libiberty/alloca.c"
-                                      "include/libiberty.h")
-                     (("C_alloca") "alloca"))))
-               (add-after 'unpack 'patch-for-modern-libc
-                 ;; https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81712
-                 ;; TODO: Make this dependant on the glibc version in the build.
-                 (lambda _
-                   (for-each
-                     (lambda (dir)
-                       (substitute* (string-append "gcc/config/"
-                                                   dir "/linux-unwind.h")
-                                    (("struct ucontext") "ucontext_t")))
-                     '("alpha" "bfin" "i386" "pa" "sh" "xtensa" "riscv"))))
-               (add-before 'configure 'setenv
-                 (lambda* (#:key outputs #:allow-other-keys)
-                   (let* ((out (assoc-ref outputs "out"))
-                          (binutils (assoc-ref %build-inputs "binutils"))
-                          (bash (assoc-ref %build-inputs "bash"))
-                          (gcc (assoc-ref %build-inputs "gcc"))
-                          (glibc (assoc-ref %build-inputs "libc")))
-                     (setenv "CC" "gcc -g") ;; TODO REMOVE Debug for the genmddeps
-                     (setenv "AR" "ar")
-                     (setenv "AS" "as")
-                     (setenv "CFLAGS" "-D HAVE_ALLOCA_H")
-                     (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
-                     (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
-                                               ":" glibc "/include"))
-                     (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
-                                                           ":" glibc "/lib"
-                                                           ":" gcc "/lib"))
-                     (format (current-error-port) "C_INCLUDE_PATH=~a\n" (getenv "C_INCLUDE_PATH"))
-                     (format (current-error-port) "LIBRARY_PATH=~a\n"
-                             (getenv "LIBRARY_PATH"))))))))
-    (native-search-paths
-      (list (search-path-specification
-              (variable "C_INCLUDE_PATH")
-              (files '("include")))
-            (search-path-specification
-              (variable "LIBRARY_PATH")
-              (files '("lib")))))))
+     (substitute-keyword-arguments (package-arguments gcc-core-muslboot0)
+       ((#:phases phases)
+        #~(modify-phases #$phases
+          (add-after 'configure 'setenv
+            (lambda* (#:key outputs #:allow-other-keys)
+              (let* ((out      (assoc-ref outputs "out"))
+                     (binutils (assoc-ref %build-inputs "binutils"))
+                     (bash     (assoc-ref %build-inputs "bash"))
+                     (gcc      (assoc-ref %build-inputs "gcc"))
+                     (glibc    (assoc-ref %build-inputs "libc")))
+                (setenv "CC" "gcc")
+                (setenv "AR" "ar")
+                (setenv "AS" "as")
+                (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
+                (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
+                                          ":" glibc "/include"))
+                (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
+                                                      ":" glibc "/lib"
+                                                      ":" gcc "/lib")))))))))))
 
 (define gcc-muslboot
   (package
