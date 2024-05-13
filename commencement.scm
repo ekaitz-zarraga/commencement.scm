@@ -1401,12 +1401,10 @@ MesCC-Tools), and finally M2-Planet.")
                                  "--enable-static")))))
 
 
-(define gcc-core-muslboot0
-  ;; GCC 4.6.4 is the latest modular distribution. We backported RISC-V support
-  ;; here.
+(define gcc-muslboot0
   (package
     (inherit gcc)
-    (name "gcc-core-muslboot0")
+    (name "gcc-muslboot0")
     (version "4.6.4")
     (source (origin
                 (method git-fetch)
@@ -1415,7 +1413,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (commit "riscv"))) ;; TODO: use version here
                 (sha256
                   (base32
-                    "1n6j6nq2zgzcp1p955rcw7clj1xxdn3ap3p3mz41bcs5k26z8lxn"))))
+                    "0pzc0knyk67zanqjlwjxyqdx6wlzph0vl4kvmfgml0vafpdqpggb"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs `(("flex" ,flex)   ;; TODO: bootstrap me
               ("bison" ,bison) ;; TODO: bootstrap me
@@ -1433,13 +1431,15 @@ MesCC-Tools), and finally M2-Planet.")
                        (srfi srfi-1))
            #:parallel-build? #f             ; for debugging
            #:configure-flags
-           #~(let ((out (assoc-ref %outputs "out"))
-                   (glibc (assoc-ref %build-inputs "libc")))
+           #~(let ((out  (assoc-ref %outputs "out"))
+                   (musl (assoc-ref %build-inputs "libc")))
                (list (string-append "--prefix=" out)
-                     (string-append "--build=" #$(%current-system))
-                     (string-append "--host="  #$(%current-system))
-                     (string-append "--with-native-system-header-dir=" glibc "/include")
-                     (string-append "--with-build-sysroot=" glibc "/include")
+                     ;(string-append "--build=" #$(%current-system)) ;; TODO: add -musl
+                     ;(string-append "--host="  #$(%current-system)) ;; TODO: add -musl
+                     "--build=riscv64-unknown-linux-musl"
+                     "--build=riscv64-unknown-linux-musl"
+                     (string-append "--with-native-system-header-dir=" musl "/include")
+                     (string-append "--with-build-sysroot=" musl "/include")
                      "--disable-bootstrap"
                      "--disable-decimal-float"
                      "--disable-libatomic"
@@ -1470,8 +1470,6 @@ MesCC-Tools), and finally M2-Planet.")
                                       "include/libiberty.h")
                      (("C_alloca") "alloca"))))
                (add-after 'unpack 'patch-for-modern-libc
-                 ;; https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81712
-                 ;; TODO: Make this dependant on the glibc version in the build.
                  (lambda _
                    (for-each
                      (lambda (dir)
@@ -1480,21 +1478,21 @@ MesCC-Tools), and finally M2-Planet.")
                                     (("struct ucontext") "ucontext_t")))
                      '("alpha" "bfin" "i386" "pa" "sh" "xtensa" "riscv"))))
                (add-before 'configure 'setenv
-                 (lambda* (#:key outputs #:allow-other-keys)
-                   (let* ((out (assoc-ref outputs "out"))
-                          (binutils (assoc-ref %build-inputs "binutils"))
-                          (bash (assoc-ref %build-inputs "bash"))
-                          (tcc (assoc-ref %build-inputs "tcc"))
-                          (glibc (assoc-ref %build-inputs "libc")))
+                 (lambda* (#:key outputs inputs #:allow-other-keys)
+                   (let* ((out      (assoc-ref outputs "out"))
+                          (binutils (assoc-ref inputs "binutils"))
+                          (bash     (assoc-ref inputs "bash"))
+                          (tcc      (assoc-ref inputs "tcc"))
+                          (musl     (assoc-ref inputs "libc")))
                      (setenv "CC" "tcc")
                      (setenv "AR" "ar")
                      (setenv "AS" "as")
                      (setenv "CFLAGS" "-D HAVE_ALLOCA_H")
                      (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
                      (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
-                                               ":" glibc "/include"))
+                                               ":" musl "/include"))
                      (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
-                                                           ":" glibc "/lib"
+                                                           ":" musl "/lib"
                                                            ":" tcc "/lib"))
                      (format (current-error-port) "C_INCLUDE_PATH=~a\n" (getenv "C_INCLUDE_PATH"))
                      (format (current-error-port) "LIBRARY_PATH=~a\n"
@@ -1511,7 +1509,7 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit musl)
     (name "musl-boot")
-    (native-inputs `(("gcc" ,gcc-core-muslboot0)
+    (native-inputs `(("gcc" ,gcc-muslboot0)
                      ("binutils" ,binutils-muslboot0)
                     ,@(package-native-inputs musl-boot0)))
     (arguments
@@ -1528,78 +1526,71 @@ MesCC-Tools), and finally M2-Planet.")
                 "--disable-shared"))))))
 
 
-(define gcc-core-muslboot
+(define gcc-muslboot
   ;; GCC 4.6.4 is the latest modular distribution. We backported RISC-V support
   ;; here.
   (package
-    (inherit gcc-core-muslboot0)
-    (name "gcc-core-muslboot")
-    (inputs `(("gcc" ,gcc-core-muslboot0)
-              ("libc" ,musl-boot)
-             ,@(alist-delete "libc" (package-inputs gcc-core-muslboot0))))
+    (inherit gcc-muslboot0)
+    (name "gcc-muslboot")
+    (native-inputs `(("gcc" ,gcc-muslboot0)
+                     ("libc" ,musl-boot)
+                     ,@(alist-delete "tcc"
+                         (alist-delete "libc" (package-native-inputs gcc-muslboot0)))))
     (arguments
-     (substitute-keyword-arguments (package-arguments gcc-core-muslboot0)
+     (substitute-keyword-arguments (package-arguments gcc-muslboot0)
+       ((#:configure-flags flags)
+        #~(let ((out   (assoc-ref %outputs "out"))
+                (musl  (assoc-ref %build-inputs "libc")))
+               (list (string-append "--prefix=" out)
+                     ;; We need -musl suffix here for libstdc++ not to use some
+                     ;; glibc specific optimizations
+                     (string-append "--build=" "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
+                     (string-append "--host="  "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
+                     (string-append "--with-native-system-header-dir=" musl "/include")
+                     (string-append "--with-build-sysroot=" musl "/include")
+                     "--disable-bootstrap"
+                     "--disable-decimal-float"
+                     "--disable-libatomic"
+                     "--disable-libcilkrts"
+                     "--disable-libgomp"
+                     "--disable-libitm"
+                     "--disable-libmudflap"
+                     "--disable-libquadmath"
+                     "--disable-libsanitizer"
+                     "--disable-libssp"
+                     "--disable-libvtv"
+                     "--disable-lto"
+                     "--disable-lto-plugin"
+                     "--disable-multilib"
+                     "--disable-plugin"
+                     "--disable-threads"
+                     "--enable-languages=c,c++"
+                     "--enable-static"
+                     "--disable-shared"
+                     "--enable-threads=single"
+                     "--disable-libstdcxx-pch"
+                     "--disable-build-with-cxx")))
        ((#:phases phases)
         #~(modify-phases #$phases
-          (add-after 'configure 'setenv
-            (lambda* (#:key outputs #:allow-other-keys)
+          (replace 'setenv
+            (lambda* (#:key outputs inputs #:allow-other-keys)
               (let* ((out      (assoc-ref outputs "out"))
-                     (binutils (assoc-ref %build-inputs "binutils"))
-                     (bash     (assoc-ref %build-inputs "bash"))
-                     (gcc      (assoc-ref %build-inputs "gcc"))
-                     (glibc    (assoc-ref %build-inputs "libc")))
+                     (binutils (assoc-ref inputs "binutils"))
+                     (bash     (assoc-ref inputs "bash"))
+                     (gcc      (assoc-ref inputs "gcc"))
+                     (musl     (assoc-ref inputs "libc")))
                 (setenv "CC" "gcc")
                 (setenv "AR" "ar")
                 (setenv "AS" "as")
                 (setenv "CONFIG_SHELL" (string-append bash "/bin/sh"))
+                (setenv "CPLUS_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
+                                          ":" musl "/include"))
                 (setenv "C_INCLUDE_PATH" (string-append (or (getenv "C_INCLUDE_PATH") "")
-                                          ":" glibc "/include"))
+                                          ":" musl "/include"))
                 (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
-                                                      ":" glibc "/lib"
+                                                      ":" musl "/lib"
                                                       ":" gcc "/lib")))))))))))
 
-(define gcc-muslboot
-  (package
-    (inherit gcc-core-muslboot)
-    (name "gcc-muslboot")
-    (version "4.6.4")
-    (native-inputs
-     `(("gcc-g++"
-        ,(origin
-           (method url-fetch)
-           (uri (string-append "mirror://gnu/gcc/gcc-"
-                               version "/gcc-g++-" version ".tar.gz"))
-           (sha256
-            (base32
-             "1fqqk5zkmdg4vmqzdmip9i42q6b82i3f6yc0n86n9021cr7ms2k9"))))
-       ("gcc" ,gcc-core-muslboot0)
-       ,@(package-native-inputs gcc-core-muslboot0)))
-    (arguments
-     (substitute-keyword-arguments (package-arguments gcc-core-muslboot0)
-       ((#:configure-flags configure-flags)
-        #~(let ((out (assoc-ref %outputs "out")))
-            `("--enable-languages=c,c++"
-              ,@(filter
-                 (negate (lambda (x) (string-prefix? "--enable-languages=" x)))
-                 #$configure-flags))))
-       ((#:phases phases)
-        #~(modify-phases #$phases
-            (add-before 'unpack 'unpack-g++
-              (lambda _
-                (let ((source-g++ (assoc-ref %build-inputs "gcc-g++")))
-                  (invoke "tar" "xvf" source-g++))))
-            (replace 'setenv
-              (lambda _
-                (setenv "CONFIG_SHELL" (which "sh"))
-
-                ;; Allow MPFR headers to be found.
-                (setenv "C_INCLUDE_PATH"
-                        (string-append (getcwd) "/mpfr/src:"
-                                       (getenv "C_INCLUDE_PATH")))
-
-                ;; Set the C++ search path so that C headers can be found as
-                ;; libstdc++ is being compiled.
-                (setenv "CPLUS_INCLUDE_PATH" (getenv "C_INCLUDE_PATH"))))))))))
 
 (define (%boot-muslboot-inputs)
   `(("gcc" ,gcc-muslboot)
