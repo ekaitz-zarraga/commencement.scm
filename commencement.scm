@@ -851,8 +851,10 @@ MesCC-Tools), and finally M2-Planet.")
     (build-system gnu-build-system)
     (inputs '())
     (propagated-inputs '())
+    ;; TODO: use `modify-inputs`
     (native-inputs `(;; We don't need "make" for this anymore
                      ,@(alist-delete "make" (%boot-tcc0-inputs))))
+
     (arguments
      `(#:implicit-inputs? #f
        #:guile ,%bootstrap-guile
@@ -1055,6 +1057,7 @@ MesCC-Tools), and finally M2-Planet.")
   `(("gzip" ,gzip-mesboot)
     ("patch" ,patch-mesboot)
     ("tcc" ,tcc-boot)
+    ;; TODO: use `modify-inputs`
     ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
 
 
@@ -1114,6 +1117,7 @@ MesCC-Tools), and finally M2-Planet.")
     (native-inputs
       `(("libc" ,musl-boot0)
         ("tcc" ,tcc-boot)
+        ;; TODO: use `modify-inputs`
         ,@(alist-delete "tcc" (package-native-inputs tcc-boot))))
     (arguments
       (substitute-keyword-arguments (package-arguments tcc-boot)
@@ -1164,6 +1168,7 @@ MesCC-Tools), and finally M2-Planet.")
     (native-inputs
       `(("libc" ,musl-boot0)
         ("tcc" ,tcc-boot-musl)
+        ;; TODO: use `modify-inputs`
         ,@(alist-delete "tcc" (package-native-inputs tcc-boot-musl))))
     (arguments
       (substitute-keyword-arguments (package-arguments tcc-boot-musl)
@@ -1203,6 +1208,7 @@ MesCC-Tools), and finally M2-Planet.")
   `(("gzip" ,gzip-mesboot)
     ("patch" ,patch-mesboot)
     ("tcc" ,tcc-musl)
+    ;; TODO: use `modify-inputs`
     ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
 
 
@@ -1534,6 +1540,7 @@ MesCC-Tools), and finally M2-Planet.")
     (name "gcc-muslboot")
     (native-inputs `(("gcc" ,gcc-muslboot0)
                      ("libc" ,musl-boot)
+                     ;; TODO: use `modify-inputs`
                      ,@(alist-delete "tcc"
                          (alist-delete "libc" (package-native-inputs gcc-muslboot0)))))
     (arguments
@@ -1604,6 +1611,7 @@ MesCC-Tools), and finally M2-Planet.")
 
 (define (%boot-muslboot-inputs)
   `(("gcc" ,gcc-muslboot)
+    ;; TODO: use `modify-inputs`
     ,@(alist-delete "gcc" (%boot-muslboot0-inputs))))
 
 (define hello-muslboot
