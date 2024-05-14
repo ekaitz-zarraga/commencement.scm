@@ -1589,7 +1589,17 @@ MesCC-Tools), and finally M2-Planet.")
                                           ":" musl "/include"))
                 (setenv "LIBRARY_PATH" (string-append (or (getenv "LIBRARY_PATH") "")
                                                       ":" musl "/lib"
-                                                      ":" gcc "/lib")))))))))))
+                                                      ":" gcc "/lib")))))))))
+   (native-search-paths
+      (list (search-path-specification
+              (variable "C_INCLUDE_PATH")
+              (files '("include")))
+            (search-path-specification
+              (variable "CPLUS_INCLUDE_PATH")
+              (files '("include/c++" "include")))
+            (search-path-specification
+              (variable "LIBRARY_PATH")
+              (files '("lib")))))))
 
 
 (define (%boot-muslboot-inputs)
