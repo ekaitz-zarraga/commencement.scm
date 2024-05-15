@@ -1540,6 +1540,7 @@ MesCC-Tools), and finally M2-Planet.")
     (name "gcc-muslboot")
     (native-inputs `(("gcc" ,gcc-muslboot0)
                      ("libc" ,musl-boot)
+                     ("find" ,findutils) ; TODO: Bootstrap me
                      ;; TODO: use `modify-inputs`
                      ,@(alist-delete "tcc"
                          (alist-delete "libc" (package-native-inputs gcc-muslboot0)))))
