@@ -851,9 +851,8 @@ MesCC-Tools), and finally M2-Planet.")
     (build-system gnu-build-system)
     (inputs '())
     (propagated-inputs '())
-    ;; TODO: use `modify-inputs`
-    (native-inputs `(;; We don't need "make" for this anymore
-                     ,@(alist-delete "make" (%boot-tcc0-inputs))))
+    ;; We don't need "make" for this anymore
+    (native-inputs (modify-inputs (%boot-tcc0-inputs) (delete "make")))
 
     (arguments
      `(#:implicit-inputs? #f
@@ -1056,9 +1055,8 @@ MesCC-Tools), and finally M2-Planet.")
 (define (%boot-tcc-inputs)
   `(("gzip" ,gzip-mesboot)
     ("patch" ,patch-mesboot)
-    ("tcc" ,tcc-boot)
-    ;; TODO: use `modify-inputs`
-    ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
+    ,@(modify-inputs (%boot-tcc0-inputs)
+                     (replace "tcc" tcc-boot))))
 
 
 (define musl-boot0
@@ -1114,11 +1112,9 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit tcc-boot)
     (name "tcc-boot-musl")
-    (native-inputs
-      `(("libc" ,musl-boot0)
-        ("tcc" ,tcc-boot)
-        ;; TODO: use `modify-inputs`
-        ,@(alist-delete "tcc" (package-native-inputs tcc-boot))))
+    (native-inputs `(("libc" ,musl-boot0)
+                     ,@(modify-inputs (package-native-inputs tcc-boot)
+                                      (replace "tcc" tcc-boot))))
     (arguments
       (substitute-keyword-arguments (package-arguments tcc-boot)
         ((#:phases phases)
@@ -1165,11 +1161,8 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit tcc-boot-musl)
     (name "tcc-musl")
-    (native-inputs
-      `(("libc" ,musl-boot0)
-        ("tcc" ,tcc-boot-musl)
-        ;; TODO: use `modify-inputs`
-        ,@(alist-delete "tcc" (package-native-inputs tcc-boot-musl))))
+    (native-inputs (modify-inputs (package-native-inputs tcc-boot-musl)
+                                  (replace "tcc"  tcc-boot-musl)))
     (arguments
       (substitute-keyword-arguments (package-arguments tcc-boot-musl)
         ((#:phases phases)
@@ -1205,11 +1198,8 @@ MesCC-Tools), and finally M2-Planet.")
                     "tcc.c"))))))))))
 
 (define (%boot-tcc-musl-inputs)
-  `(("gzip" ,gzip-mesboot)
-    ("patch" ,patch-mesboot)
-    ("tcc" ,tcc-musl)
-    ;; TODO: use `modify-inputs`
-    ,@(alist-delete "tcc" (%boot-tcc0-inputs))))
+  (modify-inputs (%boot-tcc-inputs)
+    (replace "tcc" tcc-musl)))
 
 
 (define binutils-muslboot0
@@ -1421,11 +1411,11 @@ MesCC-Tools), and finally M2-Planet.")
                   (base32
                     "0pzc0knyk67zanqjlwjxyqdx6wlzph0vl4kvmfgml0vafpdqpggb"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
-    (inputs `(("flex" ,flex)   ;; TODO: bootstrap me
-              ("bison" ,bison) ;; TODO: bootstrap me
-              ("gmp" ,gmp-boot)
-              ("mpfr" ,mpfr-boot)
-              ("mpc" ,mpc-boot)))
+    (inputs (list flex   ;; TODO: bootstrap me
+                  bison  ;; TODO: bootstrap me
+                  gmp-boot
+                  mpfr-boot
+                  mpc-boot))
     (outputs '("out"))
     (native-inputs (%boot-muslboot0-inputs))
     (arguments
@@ -1444,7 +1434,6 @@ MesCC-Tools), and finally M2-Planet.")
                      ;(string-append "--host="  #$(%current-system)) ;; TODO: add -musl
                      "--build=riscv64-unknown-linux-musl"
                      "--build=riscv64-unknown-linux-musl"
-                     (string-append "--with-native-system-header-dir=" musl "/include")
                      (string-append "--with-build-sysroot=" musl "/include")
                      "--disable-bootstrap"
                      "--disable-decimal-float"
@@ -1516,10 +1505,13 @@ MesCC-Tools), and finally M2-Planet.")
     (inherit musl)
     (name "musl-boot")
     (native-inputs `(("gcc" ,gcc-muslboot0)
-                     ("binutils" ,binutils-muslboot0)
-                    ,@(package-native-inputs musl-boot0)))
+                   ,@(modify-inputs (package-native-inputs musl-boot0)
+                                    (delete "tcc")
+                                    (append binutils-muslboot0))))
     (arguments
      (substitute-keyword-arguments (package-arguments musl-boot0)
+       ((#:guile _) %bootstrap-guile)
+       ((#:implicit-inputs _) #f)
        ((#:make-flags _)
         #~(list (string-append "SHELL=" #$(this-package-native-input "bash")
                           "/bin/bash")
@@ -1540,10 +1532,11 @@ MesCC-Tools), and finally M2-Planet.")
     (name "gcc-muslboot")
     (native-inputs `(("gcc" ,gcc-muslboot0)
                      ("libc" ,musl-boot)
-                     ("find" ,findutils) ; TODO: Bootstrap me
-                     ;; TODO: use `modify-inputs`
-                     ,@(alist-delete "tcc"
-                         (alist-delete "libc" (package-native-inputs gcc-muslboot0)))))
+                     ("find" ,findutils) ; TODO: bootstrap me
+                     ,@(modify-inputs (package-native-inputs gcc-muslboot0)
+                                      (replace "make" gnu-make-muslboot)
+                                      (delete "libc")
+                                      (delete "tcc"))))
     (arguments
      (substitute-keyword-arguments (package-arguments gcc-muslboot0)
        ((#:configure-flags flags)
@@ -1554,7 +1547,6 @@ MesCC-Tools), and finally M2-Planet.")
                      ;; glibc specific optimizations
                      (string-append "--build=" "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
                      (string-append "--host="  "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
-                     (string-append "--with-native-system-header-dir=" musl "/include")
                      (string-append "--with-build-sysroot=" musl "/include")
                      "--disable-bootstrap"
                      "--disable-decimal-float"
@@ -1612,8 +1604,10 @@ MesCC-Tools), and finally M2-Planet.")
 
 (define (%boot-muslboot-inputs)
   `(("gcc" ,gcc-muslboot)
-    ;; TODO: use `modify-inputs`
-    ,@(alist-delete "gcc" (%boot-muslboot0-inputs))))
+    ,@(modify-inputs (%boot-muslboot0-inputs)
+                     (replace "make" gnu-make-muslboot)
+                     (replace "libc" musl-boot)
+                     (delete "tcc"))))
 
 (define hello-muslboot
   ;; Check for Scheme-only bootstrap.  Note that newer versions of Hello
