@@ -1425,7 +1425,7 @@ MesCC-Tools), and finally M2-Planet.")
            #:modules '((guix build gnu-build-system)
                        (guix build utils)
                        (srfi srfi-1))
-           #:parallel-build? #f             ; for debugging
+           #:parallel-build? #t
            #:configure-flags
            #~(let ((out  (assoc-ref %outputs "out"))
                    (musl (assoc-ref %build-inputs "libc")))
@@ -1522,6 +1522,22 @@ MesCC-Tools), and finally M2-Planet.")
                                "/bin/sh")
                 "CC=gcc"
                 "--disable-shared"))))))
+
+
+(define gnu-make-muslboot
+  (package
+    (inherit gnu-make-mesboot0-riscv64)
+    (name "make-muslboot")
+    (native-inputs `(("gcc" ,gcc-muslboot0)
+                     ("libc" ,musl-boot)
+                   ,@(modify-inputs (package-native-inputs musl-boot0)
+                                    (delete "tcc")
+                                    (append binutils-muslboot0))))
+    (arguments
+      (substitute-keyword-arguments (package-arguments gnu-make-mesboot0-riscv64)
+        ((#:guile _) %bootstrap-guile)
+        ((#:implicit-inputs _) #f)
+        ((#:phases _) #~%standard-phases)))))
 
 
 (define gcc-muslboot
