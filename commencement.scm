@@ -1401,15 +1401,15 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit gcc)
     (name "gcc-muslboot0")
-    (version "4.6.4")
+    (version "4.6.4.1")
     (source (origin
                 (method git-fetch)
                 (uri (git-reference
                        (url "https://github.com/ekaitz-zarraga/gcc/")
-                       (commit "riscv"))) ;; TODO: use version here
+                       (commit (string-append "releases/gcc-" version))))
                 (sha256
                   (base32
-                    "0simwkwhzczcna693lzhj6hnqziql068kcanr0bxmsn3z3k1k1lj"))))
+                    "1sdg5d6nkj5jlqxisal8rgxi0dwbhwyz228598w5lc1a0m3ydq2g"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs (list flex   ;; TODO: bootstrap me
                   bison  ;; TODO: bootstrap me
