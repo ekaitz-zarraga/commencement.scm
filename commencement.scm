@@ -1409,7 +1409,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (commit "riscv"))) ;; TODO: use version here
                 (sha256
                   (base32
-                    "0pzc0knyk67zanqjlwjxyqdx6wlzph0vl4kvmfgml0vafpdqpggb"))))
+                    "0simwkwhzczcna693lzhj6hnqziql068kcanr0bxmsn3z3k1k1lj"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs (list flex   ;; TODO: bootstrap me
                   bison  ;; TODO: bootstrap me
