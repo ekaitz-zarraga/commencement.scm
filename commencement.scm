@@ -1617,7 +1617,6 @@ MesCC-Tools), and finally M2-Planet.")
               (variable "LIBRARY_PATH")
               (files '("lib")))))))
 
-
 (define (%boot-muslboot-inputs)
   `(("gcc" ,gcc-muslboot)
     ,@(modify-inputs (%boot-muslboot0-inputs)
@@ -1657,3 +1656,53 @@ MesCC-Tools), and finally M2-Planet.")
          (replace 'check
            (lambda _
              (invoke "./hello"))))))))
+
+
+
+(define gcc-muslboot-9
+  (package
+    (inherit gcc-9)
+    (name "gcc-muslboot")
+    (inputs (list flex   ;; TODO: bootstrap me
+                  bison  ;; TODO: bootstrap me
+                  gmp    ;; TODO: bootstrap me
+                  mpfr   ;; TODO: bootstrap me
+                  mpc    ;; TODO: bootstrap me
+                  ))
+    (propagated-inputs (list))
+    (native-inputs `(("tar" ,tar)  ;; TODO: bootstrap me
+                     ("xz"  ,xz)   ;; TODO: bootstrap me
+                     ("awk" ,gawk) ;; TODO: bootstrap me
+                     ;("sed" ,sed)
+                     ;("diffutils" ,diffutils)
+                     ,@(modify-inputs (%boot-muslboot-inputs)
+                                      (delete "bootar"))))
+    (arguments
+      (substitute-keyword-arguments (package-arguments gcc-9)
+        ((#:guile _) %bootstrap-guile)
+        ((#:implicit-inputs? _) #f)
+        ((#:configure-flags flags)
+         #~(list
+           "--host=riscv64-unknown-linux-musl"
+           "--build=riscv64-unknown-linux-musl"
+           "--target=riscv64-unknown-linux-musl"
+           "--disable-decimal-float"
+           "--disable-libatomic"
+           "--disable-libcilkrt"
+           "--disable-libgomp"
+           "--disable-libitm"
+           "--disable-libmudflap"
+           "--disable-libquadmath"
+           "--disable-libsanitizer"
+           "--disable-libssp"
+           "--disable-libvtv"
+           "--disable-lto"
+           "--disable-lto-plugin"
+           "--disable-multilib"
+           "--disable-plugin"
+           "--disable-threads"
+           "--enable-languages=c,c++"
+           "--enable-static"
+           "--disable-shared"
+           "--enable-threads=single"
+           "--disable-libstdcxx-pch"))))))
