@@ -1511,7 +1511,7 @@ MesCC-Tools), and finally M2-Planet.")
     (arguments
      (substitute-keyword-arguments (package-arguments musl-boot0)
        ((#:guile _) %bootstrap-guile)
-       ((#:implicit-inputs _) #f)
+       ((#:implicit-inputs? _ #f) #f)
        ((#:make-flags _)
         #~(list (string-append "SHELL=" #$(this-package-native-input "bash")
                           "/bin/bash")
@@ -1536,7 +1536,7 @@ MesCC-Tools), and finally M2-Planet.")
     (arguments
       (substitute-keyword-arguments (package-arguments gnu-make-mesboot0-riscv64)
         ((#:guile _) %bootstrap-guile)
-        ((#:implicit-inputs _) #f)
+        ((#:implicit-inputs? _ #f) #f)
         ((#:phases _) #~%standard-phases)))))
 
 
@@ -1680,7 +1680,7 @@ MesCC-Tools), and finally M2-Planet.")
     (arguments
       (substitute-keyword-arguments (package-arguments gcc-9)
         ((#:guile _) %bootstrap-guile)
-        ((#:implicit-inputs? _) #f)
+        ((#:implicit-inputs? _ #f) #f)
         ((#:configure-flags flags)
          #~(list
            "--host=riscv64-unknown-linux-musl"
