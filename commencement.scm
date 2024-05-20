@@ -1681,6 +1681,11 @@ MesCC-Tools), and finally M2-Planet.")
       (substitute-keyword-arguments (package-arguments gcc-9)
         ((#:guile _) %bootstrap-guile)
         ((#:implicit-inputs? _ #f) #f)
+        ((#:phases phases)
+         #~(modify-phases #$phases
+           (add-before 'patch-source-shebangs 'delete-broken-shebangs
+             (lambda _
+               (delete-file-recursively "gcc/testsuite")))))
         ((#:configure-flags flags)
          #~(list
            "--host=riscv64-unknown-linux-musl"
