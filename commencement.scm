@@ -1683,9 +1683,15 @@ MesCC-Tools), and finally M2-Planet.")
         ((#:implicit-inputs? _ #f) #f)
         ((#:phases phases)
          #~(modify-phases #$phases
-           (add-before 'patch-source-shebangs 'delete-broken-shebangs
-             (lambda _
-               (delete-file-recursively "gcc/testsuite")))))
+            (add-after 'patch-source-shebangs 'patch-extra-shebangs
+              (lambda _
+                (substitute* "gcc/genmultilib"
+                  (("#!/bin/sh") (string-append "#!" (which "sh"))))))
+            (add-before 'patch-source-shebangs 'delete-broken-shebangs
+              (lambda _
+                (for-each (lambda (file)
+                           (delete-file-recursively file))
+                   (find-files "gcc/testsuite/gdc.test/compilable" "\\.d$"))))))
         ((#:configure-flags flags)
          #~(list
            "--host=riscv64-unknown-linux-musl"
@@ -1710,4 +1716,5 @@ MesCC-Tools), and finally M2-Planet.")
            "--enable-static"
            "--disable-shared"
            "--enable-threads=single"
-           "--disable-libstdcxx-pch"))))))
+           "--disable-libstdcxx-pch"
+           "--disable-build-with-cxx" ))))))
