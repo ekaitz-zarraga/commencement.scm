@@ -1399,7 +1399,7 @@ MesCC-Tools), and finally M2-Planet.")
 
 (define gcc-muslboot0
   (package
-    (inherit gcc)
+    (inherit gcc-4.7)
     (name "gcc-muslboot0")
     (version "4.6.4.1")
     (source (origin
@@ -1430,11 +1430,9 @@ MesCC-Tools), and finally M2-Planet.")
            #~(let ((out  (assoc-ref %outputs "out"))
                    (musl (assoc-ref %build-inputs "libc")))
                (list (string-append "--prefix=" out)
-                     ;(string-append "--build=" #$(%current-system)) ;; TODO: add -musl
-                     ;(string-append "--host="  #$(%current-system)) ;; TODO: add -musl
-                     "--build=riscv64-unknown-linux-musl"
-                     "--build=riscv64-unknown-linux-musl"
                      (string-append "--with-build-sysroot=" musl "/include")
+                     "--build=riscv64-unknown-linux-musl" ; TODO: generalize
+                     "--host=riscv64-unknown-linux-musl"  ; TODO: generalize
                      "--disable-bootstrap"
                      "--disable-decimal-float"
                      "--disable-libatomic"
@@ -1561,8 +1559,8 @@ MesCC-Tools), and finally M2-Planet.")
                (list (string-append "--prefix=" out)
                      ;; We need -musl suffix here for libstdc++ not to use some
                      ;; glibc specific optimizations
-                     (string-append "--build=" "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
-                     (string-append "--host="  "riscv64-unknown-linux-musl") ; TODO: generalize for every arch
+                     "--build=riscv64-unknown-linux-musl" ; TODO: generalize for every arch
+                     "--host=riscv64-unknown-linux-musl"  ; TODO: generalize for every arch
                      (string-append "--with-build-sysroot=" musl "/include")
                      "--disable-bootstrap"
                      "--disable-decimal-float"
@@ -1640,7 +1638,6 @@ MesCC-Tools), and finally M2-Planet.")
        (sha256
         (base32
          "0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i"))))
-    (supported-systems '("i686-linux" "x86_64-linux"))
     (inputs '())
     (propagated-inputs '())
     (native-inputs (%boot-muslboot-inputs))
@@ -1673,7 +1670,7 @@ MesCC-Tools), and finally M2-Planet.")
     (native-inputs `(("tar" ,tar)  ;; TODO: bootstrap me
                      ("xz"  ,xz)   ;; TODO: bootstrap me
                      ("awk" ,gawk) ;; TODO: bootstrap me
-                     ;("sed" ,sed)
+                     ; ("sed" ,sed)  ;; TODO: bootstrap me
                      ;("diffutils" ,diffutils)
                      ,@(modify-inputs (%boot-muslboot-inputs)
                                       (delete "bootar"))))
@@ -1692,13 +1689,14 @@ MesCC-Tools), and finally M2-Planet.")
                 (for-each (lambda (file)
                            (delete-file-recursively file))
                    (find-files "gcc/testsuite/gdc.test/compilable" "\\.d$"))))))
+        ((#:parallel-build? _ #t) #f)
         ((#:make-flags f #t) #~(list))
         ((#:configure-flags flags)
          #~(let ((out (assoc-ref %outputs "out"))
                  (musl (assoc-ref %build-inputs "libc")))
             (list (string-append "--prefix=" out)
-                  "--host=riscv64-unknown-linux-musl"
-                  "--build=riscv64-unknown-linux-musl"
+                  ;"--host=riscv64-unknown-linux-musl"
+                  ;"--build=riscv64-unknown-linux-musl"
                   (string-append "--with-build-sysroot=" musl "/include")
                   "--disable-bootstrap"
                   "--disable-decimal-float"
