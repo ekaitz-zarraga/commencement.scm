@@ -1693,7 +1693,8 @@ MesCC-Tools), and finally M2-Planet.")
         ((#:configure-flags flags)
          #~(let ((out (assoc-ref %outputs "out"))
                  (musl (assoc-ref %build-inputs "libc")))
-            (list (string-append "--prefix=" out)
+            (list "LDFLAGS=-static"
+                  (string-append "--prefix=" out)
                   ;"--host=riscv64-unknown-linux-musl"
                   ;"--build=riscv64-unknown-linux-musl"
                   (string-append "--with-build-sysroot=" musl "/include")
