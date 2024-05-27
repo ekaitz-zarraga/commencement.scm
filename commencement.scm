@@ -1661,9 +1661,9 @@ MesCC-Tools), and finally M2-Planet.")
     (name "gcc-muslboot")
     (inputs (list flex   ;; TODO: bootstrap me
                   bison  ;; TODO: bootstrap me
-                  gmp    ;; TODO: bootstrap me
-                  mpfr   ;; TODO: bootstrap me
-                  mpc    ;; TODO: bootstrap me
+                  gmp-boot    ;; TODO: bootstrap me
+                  mpfr-boot   ;; TODO: bootstrap me
+                  mpc-boot    ;; TODO: bootstrap me
                   ))
     (propagated-inputs (list))
     (native-inputs `(("tar" ,tar)  ;; TODO: bootstrap me
@@ -1697,7 +1697,8 @@ MesCC-Tools), and finally M2-Planet.")
                   (string-append "--prefix=" out)
                   ;"--host=riscv64-unknown-linux-musl"
                   ;"--build=riscv64-unknown-linux-musl"
-                  (string-append "--with-build-sysroot=" musl "/include")
+                  (string-append "--with-build-sysroot=" musl )
+                  (string-append "--with-native-system-header-dir=" "/include")
                   "--disable-bootstrap"
                   "--disable-decimal-float"
                   "--disable-libatomic"
@@ -1714,7 +1715,7 @@ MesCC-Tools), and finally M2-Planet.")
                   "--disable-multilib"
                   "--disable-plugin"
                   "--disable-threads"
-                  "--enable-languages=c,c++"
+                  "--enable-languages=c"
                   "--enable-static"
                   "--disable-shared"
                   "--enable-threads=single"
