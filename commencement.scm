@@ -840,7 +840,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "031fs6nl123qfy76hfcc16g7jp3islmvdbx8by0yzjz6qqw2g4av")))
+                    "05slgpsavjd76pnkhghik3skmmic8d1py1b3jvcklcvkh1jv3s8i")))
       #;(origin
               (method url-fetch)
               (uri (string-append "mirror://savannah/tinycc/tcc-"
