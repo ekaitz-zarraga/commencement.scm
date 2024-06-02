@@ -1409,7 +1409,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (commit (string-append "releases/gcc-" version))))
                 (sha256
                   (base32
-                    "1sdg5d6nkj5jlqxisal8rgxi0dwbhwyz228598w5lc1a0m3ydq2g"))))
+                    "067gd2gnxrp8rr9bsrjjbb3222sqdwcf41wahg0wfdjxvmvx3ri6"))))
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs (list flex   ;; TODO: bootstrap me
                   bison  ;; TODO: bootstrap me
