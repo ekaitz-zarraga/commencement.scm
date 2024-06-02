@@ -391,7 +391,7 @@ MesCC-Tools), and finally M2-Planet.")
                        (recursive? #t)))
                 (sha256
                   (base32
-                    "1ibkdkdwhgn4pypfzd0q0bf37hw77k8mxkc2biz6hrb0k6l1vmgh")))
+                    "07d7bkk9m6ngdv2z9zxwqm3aik5kggplxcwn60gaqi8pljz5kzh1")))
       #;(origin
               (method url-fetch)
               (uri (list (string-append "mirror://gnu/mes/"
