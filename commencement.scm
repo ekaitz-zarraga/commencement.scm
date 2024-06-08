@@ -381,18 +381,8 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit mes)
     (name "mes-boot")
-    (version "wip")
-    (source
-      (origin
-                (method git-fetch)
-                (uri (git-reference
-                       (url "https://github.com/ekaitz-zarraga/mes/")
-                       (commit version)
-                       (recursive? #t)))
-                (sha256
-                  (base32
-                    "07d7bkk9m6ngdv2z9zxwqm3aik5kggplxcwn60gaqi8pljz5kzh1")))
-      #;(origin
+    (version "0.26.1")
+    (source (origin
               (method url-fetch)
               (uri (list (string-append "mirror://gnu/mes/"
                                    "mes-" version ".tar.gz")
@@ -400,7 +390,7 @@ MesCC-Tools), and finally M2-Planet.")
                                         "mes-" version ".tar.gz")))
               (sha256
                (base32
-                "03np6h4qx94givjdvq2rmhvab38y5f91254n0avg4vq2j0cx78in"))))
+                "1x7wq9cj8pybdl736mn8z48zcwgvyvi9mr9mr9vv9jxzii90sdz1"))))
     (inputs '())
     (propagated-inputs '())
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
@@ -488,18 +478,8 @@ MesCC-Tools), and finally M2-Planet.")
   (package
     (inherit tcc)
     (name "tcc-boot0")
-    ;(version "0.9.26-1150-ga0de0ae4")
-    (version "riscv-mes")
-    (source  (origin
-                (method git-fetch)
-                (uri (git-reference
-                       (url "https://github.com/ekaitz-zarraga/tcc/")
-                       (commit version)
-                       (recursive? #t)))
-                (sha256
-                  (base32
-                    "0fiml0yk257c3qhzwsainlfvhzrql9nkvpjjjwa865xk828pq08k")))
-            #;(origin
+    (version "0.9.26-1157-gdd46e018")
+    (source (origin
               (method url-fetch)
               (uri (list
                     (string-append "mirror://gnu/guix/mirror/"
@@ -508,7 +488,7 @@ MesCC-Tools), and finally M2-Planet.")
                                    "tcc-" version ".tar.gz")))
               (sha256
                (base32
-                "1b8wrf6w4ygwpcg63v9lcrqllnhnpa026fhr67fsq2s666qxwzwq"))))
+                "0bi32a1xdndz4ffway4ghcn2nfcnyd78mwh9vq2khyqyrnmc0j1p"))))
     (build-system gnu-build-system)
     (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
     (inputs '())
@@ -728,9 +708,7 @@ MesCC-Tools), and finally M2-Planet.")
              (substitute* "make.h"
                (("^extern long int lseek.*" all) (string-append "// " all)))))
          (replace 'configure (lambda _
-           (call-with-output-file "config.h" (lambda (p) (display "" p)))
-           (call-with-output-file "putenv_stub.c"
-            (lambda (p) (display "int putenv(char *string) { return 0; }" p)))))
+           (call-with-output-file "config.h" (lambda (p) (display "" p)))))
          (replace 'build
            (lambda _
             (invoke "tcc" "-c" "-g" "-DNO_FLOAT" "getopt.c")
@@ -789,13 +767,12 @@ MesCC-Tools), and finally M2-Planet.")
                     "glob/fnmatch.c")
             (invoke "tcc" "-c" "-g" "-DNO_FLOAT" "-Iglob" "-DHAVE_STRDUP"
                     "-DHAVE_DIRENT_H" "glob/glob.c")
-            (invoke "tcc" "-c" "-g" "-DNO_FLOAT" "putenv_stub.c")
             (invoke "tcc" "-g" "-static" "-o" "make" "getopt.o" "getopt1.o" "ar.o"
                     "arscan.o" "commands.o" "default.o" "dir.o" "expand.o" "file.o"
                     "function.o" "implicit.o" "job.o" "main.o" "misc.o" "read.o"
                     "remake.o" "rule.o" "signame.o" "strcache.o" "variable.o"
                     "version.o" "vpath.o" "hash.o" "remote-stub.o" "getloadavg.o"
-                    "fnmatch.o" "glob.o" "putenv_stub.o")))
+                    "fnmatch.o" "glob.o")))
          (replace 'check                ; proper check needs awk
            (lambda _
              (invoke "./make" "--version")))
