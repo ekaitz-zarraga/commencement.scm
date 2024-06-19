@@ -1273,6 +1273,28 @@ MesCC-Tools), and finally M2-Planet.")
        #:strip-binaries? #f
        #:configure-flags #~(list "CC=tcc" "AR=ar" "AS=as")))))
 
+(define xz-boot
+  (package
+    (inherit xz)
+    (name "xz-boot")
+    (source (bootstrap-origin (package-source xz)))
+    (native-inputs (%boot-muslboot0-inputs))
+    (supported-systems '("i686-linux" "x86_64-linux" "riscv64-linux"))
+    (inputs '())
+    (propagated-inputs '())
+    (arguments
+     (ensure-keyword-arguments (package-arguments xz)
+                               `(#:implicit-inputs? #f
+                                 #:configure-flags (list "CC=tcc"
+                                                         "--enable-static"
+                                                         "--disable-shared"
+                                                         "--disable-nls"
+                                                         "--disable-symbol-versions"
+                                                         )
+                                 #:guile ,%bootstrap-guile
+                                 #:tests? #f)))))
+
+
 (define (%boot-multiprecision-inputs)
   `(("m4" ,m4-boot)
     ("libc" ,musl-boot0)
